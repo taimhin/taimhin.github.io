@@ -656,12 +656,47 @@ body.nav-open .nav-toggle span:nth-child(2) { top: 22px; transform: rotate(-45de
   border-top: 1px solid var(--line);
   background: linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 40%);
 }
+.filter-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: clamp(38px, 5vw, 64px);
+}
 .filter-bar {
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
   gap: clamp(10px, 2vw, 22px);
-  margin-bottom: clamp(38px, 5vw, 64px);
+}
+.subfilter-bar {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 1020px;
+}
+.subfilter-bar[hidden] {
+  display: none;
+}
+.subfilter-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  padding-left: calc(16px + 0.16em);
+  color: var(--ink-dim);
+  transition: color 0.4s var(--ease-out), border-color 0.4s var(--ease-out), background 0.4s var(--ease-out);
+}
+.subfilter-btn:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+.subfilter-btn.is-active {
+  color: #14100a;
+  background: var(--gold);
+  border-color: var(--gold);
 }
 .filter-btn {
   position: relative;

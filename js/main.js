@@ -54,7 +54,7 @@
   });
 
   /* ---------- 導覽高亮(捲動偵測) ---------- */
-  var sections = ["home", "about", "featured", "gallery", "contact"];
+  var sections = ["home", "featured", "gallery", "contact"];
   var navLinks = {};
   $$(".nav-link").forEach(function (link) {
     var id = (link.getAttribute("href") || "").replace("#", "");
@@ -94,14 +94,43 @@
 
   /* ---------- 作品集篩選 ---------- */
   var filterBtns = $$(".filter-btn");
+  var subFilterBar = $("#subFilterBar");
+  var subBtns = $$(".subfilter-btn");
   var items = $$(".g-item");
   var galleryNote = $("#galleryNote");
   var total = items.length;
+  var activeFilter = "all";
+  var activeSub = "all";
 
-  function applyFilter(filter) {
+  function setActive(btns, btn) {
+    btns.forEach(function (b) {
+      var active = b === btn;
+      b.classList.toggle("is-active", active);
+      b.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+  }
+
+  function findBtn(btns, attr, value) {
+    var found = null;
+    btns.forEach(function (b) {
+      if (b.getAttribute(attr) === value) found = b;
+    });
+    return found;
+  }
+
+  function applyFilters() {
     var shown = 0;
     items.forEach(function (item, i) {
-      var match = filter === "all" || item.getAttribute("data-cat") === filter;
+      var cat = item.getAttribute("data-cat");
+      var sub = item.getAttribute("data-sub");
+      var match;
+      if (activeFilter === "all") {
+        match = true;
+      } else if (activeFilter === "event") {
+        match = cat === "event" && (activeSub === "all" || sub === activeSub);
+      } else {
+        match = cat === activeFilter;
+      }
       item.classList.toggle("is-hidden", !match);
       if (match) {
         shown++;
@@ -115,8 +144,9 @@
         }
       }
     });
+    if (subFilterBar) subFilterBar.hidden = activeFilter !== "event";
     if (galleryNote) {
-      galleryNote.textContent = filter === "all"
+      galleryNote.textContent = activeFilter === "all"
         ? "共 " + total + " 件作品 · 點擊可放大檢視"
         : "顯示 " + shown + " 件作品 · 共 " + total + " 件";
     }
@@ -124,12 +154,20 @@
 
   filterBtns.forEach(function (btn) {
     btn.addEventListener("click", function () {
-      filterBtns.forEach(function (b) {
-        var active = b === btn;
-        b.classList.toggle("is-active", active);
-        b.setAttribute("aria-pressed", active ? "true" : "false");
-      });
-      applyFilter(btn.getAttribute("data-filter") || "all");
+      setActive(filterBtns, btn);
+      activeFilter = btn.getAttribute("data-filter") || "all";
+      activeSub = "all";
+      var allSub = findBtn(subBtns, "data-subfilter", "all");
+      if (allSub) setActive(subBtns, allSub);
+      applyFilters();
+    });
+  });
+
+  subBtns.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      setActive(subBtns, btn);
+      activeSub = btn.getAttribute("data-subfilter") || "all";
+      applyFilters();
     });
   });
 
@@ -236,12 +274,13 @@
         var wasHidden = target.classList.contains("is-hidden");
         if (wasHidden) {
           /* 若目前篩選隱藏了它,先回復為全部 */
-          filterBtns.forEach(function (b) {
-            var active = b.getAttribute("data-filter") === "all";
-            b.classList.toggle("is-active", active);
-            b.setAttribute("aria-pressed", active ? "true" : "false");
-          });
-          applyFilter("all");
+          activeFilter = "all";
+          activeSub = "all";
+          var allBtn = findBtn(filterBtns, "data-filter", "all");
+          if (allBtn) setActive(filterBtns, allBtn);
+          var allSubBtn = findBtn(subBtns, "data-subfilter", "all");
+          if (allSubBtn) setActive(subBtns, allSubBtn);
+          applyFilters();
         }
         openLb(target);
       }
