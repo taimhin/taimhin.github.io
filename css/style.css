@@ -3,6 +3,50 @@
    Ultra-premium dark gallery stylesheet
    ============================================================ */
 
+/* ---------- 本地字型(已子集化,載入極快) ---------- */
+@font-face {
+  font-family: "Noto Serif TC";
+  src: url("../assets/fonts/noto-serif-tc.woff2") format("woff2");
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans TC";
+  src: url("../assets/fonts/noto-sans-tc.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Cormorant Garamond";
+  src: url("../assets/fonts/cormorant.woff2") format("woff2");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Cormorant Garamond";
+  src: url("../assets/fonts/cormorant-italic.woff2") format("woff2");
+  font-weight: 300 700;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Jost";
+  src: url("../assets/fonts/jost.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Jost";
+  src: url("../assets/fonts/jost-italic.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
 :root {
   --bg: #0a0a0c;
   --bg-soft: #101014;
@@ -364,9 +408,14 @@ body.nav-open .nav-toggle span:nth-child(2) { top: 22px; transform: rotate(-45de
   position: absolute;
   inset: 0;
   z-index: -2;
-  background: url("../assets/hero.jpg") center 42% / cover no-repeat;
+  background: url("../assets/hero.webp") center 42% / cover no-repeat;
   animation: hero-zoom 28s var(--ease-out) infinite alternate;
   transform-origin: 50% 42%;
+}
+@media (max-width: 900px) {
+  .hero-bg {
+    background-image: url("../assets/hero-1280.webp");
+  }
 }
 @keyframes hero-zoom {
   from { transform: scale(1); }

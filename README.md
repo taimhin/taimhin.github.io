@@ -9,6 +9,18 @@
 - 線上版本:https://taimhin.github.io/
 - (可選)用本機伺服器:在此資料夾執行 `python -m http.server 8000`,再瀏覽 http://localhost:8000/
 
+## 技術優化(專業級)
+
+| 項目 | 做法 |
+| --- | --- |
+| 圖片格式 | 全部轉為 **WebP**:同尺寸下比 JPEG 清晰、體積更細 |
+| 響應式載入 | 每個作品備有 **1280px / 900px** 兩個版本,瀏覽器按螢幕自動揀(手機載細圖、高清芒載大圖)|
+| 字型 | **本地子集化字型**(只嵌入網站用到的字,共約 370KB),唔再連 Google Fonts,開頁更快、離線都靚 |
+| 首頁大圖 | WebP 格式 + 兩個尺寸(2560px / 1280px)+ preload 加速顯示 |
+| 社交分享 | Open Graph 大圖(og-image.jpg)+ 結構化資料 JSON-LD |
+| SEO / 專業度 | sitemap.xml、robots.txt、404 頁面、canonical 網址 |
+| 動效 | 捲動進場、磁磚動畫、燈箱縮放(平滑高效)|
+
 ## 網站功能
 
 | 功能 | 說明 |
@@ -23,7 +35,7 @@
 
 ## 相片分類(校園活動)
 
-按年份班級及活動分類,共 18 類 402 張:
+共 18 類 402 張:
 F1數學比賽(28)、F2數學比賽(23)、F3填海講座(6)、F3搭棚工藝(22)、
 F3數學比賽(46)、F3班級競賽(39)、F3航海講座(12)、F3行政人員入班講解新課程(7)、
 F3選科講解會(14)、F3選科講解會(親子專場)(23)、中小學復活節祈禱會(7)、
@@ -35,31 +47,37 @@ F3選科講解會(14)、F3選科講解會(親子專場)(23)、中小學復活節
 ```
 個人攝影網站/
 ├── index.html          # 網站主體
+├── 404.html            # 自訂 404 頁
+├── robots.txt / sitemap.xml
 ├── 開啟網站.bat         # 雙擊即可開啟網站
-├── css/style.css       # 樣式(深色金色高質感主題)
+├── css/style.css       # 樣式(含本地字型宣告)
 ├── js/main.js          # 互動邏輯(燈箱、篩選、複製功能、動效)
 └── assets/
-    ├── hero.jpg        # 首頁大圖
-    ├── favicon.svg     # 網站圖示
-    ├── photos/         # 大圖(燈箱用,fw-xx=煙花、ev-xx-xxx=校園活動)
-    └── thumbs/         # 縮圖(作品集用)
+    ├── hero.webp / hero-1280.webp   # 首頁大圖(兩個尺寸)
+    ├── og-image.jpg                 # 社交分享圖
+    ├── favicon.svg
+    ├── fonts/          # 子集化字型(6 個 woff2,約 370KB)
+    ├── photos/         # 燈箱大圖 1920px WebP
+    ├── thumbs/         # 格仔圖 1280px WebP
+    └── thumbs-sm/      # 格仔細圖 900px WebP(手機用)
 ```
 
 ## 如何換成自己的照片
 
 1. 準備你的照片(JPG)。
-2. 換掉 `assets/photos/` 和 `assets/thumbs/` 裡對應檔名的圖片(檔名不變就不用改 HTML)。
+2. 需要重新生成 WebP 的話,用 Python + Pillow 轉檔;或者直接以同名替換
+   `assets/photos/`、`assets/thumbs/`、`assets/thumbs-sm/` 三個資料夾的檔案(檔名不變就不用改 HTML)。
 3. 想改標題/描述,打開 `index.html` 找到對應的 `<figure>`,修改
-   `data-title`(標題)與 `data-desc`(描述);篩選按鈕內的分類名亦可直接改。
+   `data-title`(標題)與 `data-desc`(描述)。
 
 ## 如何改個人資料
 
-- **名字**:搜尋「戴文軒」或「Tai Man Hin」,會出現在頁首、頁尾。
+- **名字**:搜尋「戴文軒」或「Tai Man Hin」。
 - **首頁標語**「凝住光的一瞬」→ 搜尋 `hero-title`。
-- **電話** 172 0593 9917 / 6395 9955 → 搜尋 `tel:`(注意國際區號)。
+- **電話** 172 0593 9917 / 6395 9955 → 搜尋 `tel:`。
 - **微信號** Tai110508 → 搜尋 `wechatId`。
 
-## 小提示
+## 部署
 
-- 網站部署:已部署於 GitHub Pages(repo: `taimhin/taimhin.github.io`)。
-- 改完檔案後,把資料夾內容推送到該 repo 的 `main` 分支即可更新線上版本。
+已部署於 GitHub Pages(repo: `taimhin/taimhin.github.io`)。
+改完檔案後,把資料夾內容推送到該 repo 的 `main` 分支即可更新線上版本。
