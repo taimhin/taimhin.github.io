@@ -644,7 +644,7 @@ ul, ol {
 .hero-title-zh {
   order: 1;
   font-family: var(--serif-zh);
-  font-size: clamp(4rem, 10.2vw, 8.8rem);
+  font-size: clamp(3.4rem, 7vw, 6.2rem);
   font-weight: 200;
   letter-spacing: 0.12em;
   line-height: 1;
@@ -2390,7 +2390,7 @@ html[lang="en"] .selected-title {
   }
 
   .hero-title-zh {
-    font-size: clamp(3.5rem, 17vw, 5.2rem);
+    font-size: clamp(2.7rem, 14vw, 4.4rem);
     letter-spacing: 0.1em;
   }
 
@@ -2613,7 +2613,7 @@ html[lang="en"] .selected-title {
   }
 
   .hero-title-zh {
-    font-size: clamp(3.2rem, 15.5vw, 4.2rem);
+    font-size: clamp(2.1rem, 13vw, 3.2rem);
   }
 
   .hero-lede {
