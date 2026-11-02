@@ -164,7 +164,7 @@ python tools/optimize_images.py "C:\path\to\your\photo.jpg"
 
 ### 字體大小與粗細
 
-整體字重已從原本的 300 調到 400；英文大標使用 Cormorant Garamond 500。網站字級基準為 22px，正文約 22px，小標籤約 12～15px。若你覺得還要更大，可以調整 `css/style.css` 裡的 `html { font-size: 22px; }`（會等比放大所有 rem 字級），或個別加大 `font-size`。若要更粗，可把 `font-weight: 400` 調成 500（中文）或 600（標題）。
+整體字重已從原本的 300 調到 400；英文大標使用 Cormorant Garamond 500。網站字級基準為 21px，正文約 21px，小標籤約 11～14px。若你覺得還要調整，可以修改 `css/style.css` 裡的 `html { font-size: 21px; }`（會等比放大所有 rem 字級），或個別調整 `font-size`。若要更粗，可把 `font-weight: 400` 調成 500（中文）或 600（標題）。
 
 ## 部署到 GitHub Pages
 
