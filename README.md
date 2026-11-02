@@ -2,6 +2,9 @@
 
 復古電影感 × 科技 HUD 風格的多頁攝影作品集。純 HTML / CSS / JavaScript，沒有框架、沒有建置步驟，可直接放在 GitHub Pages。
 
+> 線上網站：<https://taimhin.github.io/photo-portfolio/>  
+> GitHub repo：<https://github.com/taimhin/photo-portfolio>
+
 ## 頁面結構
 
 | 頁面 | 內容 |
@@ -165,14 +168,14 @@ python tools/optimize_images.py "C:\path\to\your\photo.jpg"
 
 ## 部署到 GitHub Pages
 
-專案已在本機初始化 Git repository，但還沒有推送到 GitHub。確認預覽沒問題後：
+網站已部署在 GitHub Pages：<https://taimhin.github.io/photo-portfolio/>。以下步驟保留作日後搬移 repo、重新部署或更換帳號時參考。
 
-1. 在 GitHub 建立一個新的 repository，例如 `photo-portfolio`（不要勾選 Add a README）。
-2. 在 PowerShell 執行（把 `<你的帳號>` 換成你的 GitHub 使用者名稱）：
+1. 在 GitHub 建立 repository `photo-portfolio`（已建立）。
+2. 在 PowerShell 執行：
 
 ```powershell
 cd C:\Users\tai\Desktop\photo-portfolio
-git remote add origin https://github.com/<你的帳號>/photo-portfolio.git
+git remote add origin https://github.com/taimhin/photo-portfolio.git
 git branch -M main
 git push -u origin main
 ```
@@ -183,7 +186,7 @@ git push -u origin main
 6. 等 1～3 分鐘，網站會在：
 
 ```text
-https://<你的帳號>.github.io/photo-portfolio/
+https://taimhin.github.io/photo-portfolio/
 ```
 
 ### 部署後建議修改
@@ -191,15 +194,15 @@ https://<你的帳號>.github.io/photo-portfolio/
 把 `index.html` 裡的社群預覽圖改成完整網址，否則 Facebook / LINE 等平台可能抓不到：
 
 ```html
-<meta property="og:image" content="https://<你的帳號>.github.io/photo-portfolio/assets/images/og-cover.jpg">
-<meta name="twitter:image" content="https://<你的帳號>.github.io/photo-portfolio/assets/images/og-cover.jpg">
+<meta property="og:image" content="https://taimhin.github.io/photo-portfolio/assets/images/og-cover.jpg">
+<meta name="twitter:image" content="https://taimhin.github.io/photo-portfolio/assets/images/og-cover.jpg">
 ```
 
 其他頁面（`works.html`、`about.html`、`contact.html`）也有同樣的 `og:image` 與 `twitter:image`，部署後可一併更新。
 
 ### 使用 GitHub CLI
 
-如果你已安裝 GitHub CLI，也可以：
+如果日後要重新建立 repo，也可以使用 GitHub CLI：
 
 ```powershell
 gh auth login
@@ -213,4 +216,4 @@ gh repo create photo-portfolio --public --source=. --remote=origin --push
 - 專案包含約 177MB 原始照片，第一次 push 可能需要一些時間。GitHub 單一檔案上限 100MB，本站最大檔案約 12MB，沒有問題；GitHub Pages 網站上限為 1GB。
 - 所有照片版權屬於戴文軒，請勿在未經同意的情況下轉載或商業使用。
 - 字型使用 Google Fonts：Cormorant Garamond、IBM Plex Mono、Noto Sans TC、Noto Serif TC。若在沒有網路的環境預覽，會退回系統字型。
-- 目前 `gh` 尚未登入；如果要用 CLI 建立 repo，先執行 `gh auth login`。
+- `gh` 目前已登入 `taimhin`；若日後更換 GitHub 帳號，重新執行 `gh auth login`。
