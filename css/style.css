@@ -36,6 +36,7 @@
 }
 
 html {
+  font-size: 20px;
   background: var(--bg);
   color-scheme: dark;
   scroll-behavior: smooth;
@@ -870,6 +871,7 @@ ul, ol {
 .section-title {
   margin-top: 22px;
   font-family: var(--serif-zh);
+  text-wrap: balance;
   font-size: clamp(2.3rem, 5vw, 4.4rem);
   font-weight: 400;
   letter-spacing: 0.06em;
@@ -1152,8 +1154,9 @@ ul, ol {
 }
 
 .about-lead {
-  max-width: 620px;
+  max-width: 720px;
   margin-top: 30px;
+  text-wrap: balance;
   font-family: var(--serif-zh);
   font-size: clamp(1.3rem, 2vw, 1.75rem);
   font-weight: 400;
@@ -2007,9 +2010,243 @@ html[lang="en"] .selected-title {
     gap: 12px;
   }
 
-  .selected-title {
-    font-size: 0.88rem;
+  .selected-info {
+    gap: 0;
   }
+
+  .selected-arrow {
+    display: none;
+  }
+
+  .selected-title {
+    font-size: 0.92rem;
+    text-wrap: balance;
+  }
+
+  .contact-link {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .contact-arrow {
+    display: none;
+  }
+}
+
+/* ---------- Larger type scale ---------- */
+.eyebrow {
+  font-size: clamp(0.66rem, 0.95vw, 0.76rem);
+}
+
+.hero-title-en {
+  font-size: clamp(0.72rem, 1.15vw, 0.9rem);
+}
+
+.hero-tagline {
+  font-size: clamp(1.5rem, 2.5vw, 2.05rem);
+}
+
+.hero-lede {
+  font-size: clamp(0.98rem, 1.08vw, 1.06rem);
+}
+
+.btn {
+  font-size: 0.64rem;
+}
+
+.hero-hud {
+  font-size: 0.66rem;
+}
+
+.hud-label {
+  font-size: 0.58rem;
+}
+
+.hud-status {
+  font-size: 0.6rem;
+}
+
+.hero-scroll {
+  font-size: 0.6rem;
+}
+
+.brand-en {
+  font-size: 0.58rem;
+}
+
+.nav-num {
+  font-size: 0.58rem;
+}
+
+.desktop-nav a {
+  font-size: 0.7rem;
+}
+
+.lang-toggle {
+  font-size: 0.66rem;
+}
+
+.section-label {
+  font-size: 0.66rem;
+}
+
+.section-meta {
+  font-size: 0.62rem;
+}
+
+.works-lede {
+  font-size: clamp(0.95rem, 1.02vw, 1.02rem);
+}
+
+.filter {
+  font-size: 0.66rem;
+}
+
+.filter .count {
+  font-size: 0.56rem;
+}
+
+.filter-note {
+  font-size: 0.56rem;
+}
+
+.work-tag,
+.work-frame {
+  font-size: 0.56rem;
+}
+
+.work-open {
+  font-size: 0.62rem;
+}
+
+.work-title {
+  font-size: clamp(1.03rem, 1.08vw, 1.18rem);
+}
+
+.work-sub,
+.work-index {
+  font-size: 0.6rem;
+}
+
+.about-lead {
+  font-size: clamp(1.4rem, 2.1vw, 1.9rem);
+}
+
+.about-body p {
+  font-size: 1rem;
+}
+
+.about-quote {
+  font-size: clamp(1.25rem, 1.9vw, 1.65rem);
+}
+
+.about-facts dt {
+  font-size: 0.6rem;
+}
+
+.about-facts dd {
+  font-size: 0.72rem;
+}
+
+.figure-tag,
+.figure-coords {
+  font-size: 0.6rem;
+}
+
+.about-figure figcaption {
+  font-size: 0.58rem;
+}
+
+.contact-title {
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+}
+
+.contact-lede {
+  font-size: 1rem;
+}
+
+.contact-label {
+  font-size: 0.62rem;
+}
+
+.contact-value {
+  font-size: clamp(0.9rem, 1.1vw, 1rem);
+}
+
+.copy-email {
+  font-size: 0.66rem;
+}
+
+.contact-note {
+  font-size: 0.62rem;
+}
+
+.footer-inner {
+  font-size: 0.62rem;
+}
+
+.footer-brand {
+  font-size: 0.95rem;
+}
+
+.footer-brand span {
+  font-size: 0.56rem;
+}
+
+.selected-title {
+  font-size: clamp(1.03rem, 1.08vw, 1.15rem);
+}
+
+.selected-sub,
+.selected-index {
+  font-size: 0.58rem;
+}
+
+.lightbox-meta {
+  font-size: 0.62rem;
+}
+
+.lightbox-quality {
+  font-size: 0.54rem;
+}
+
+.lightbox-title {
+  font-size: clamp(1.9rem, 3vw, 2.8rem);
+}
+
+.lightbox-location {
+  font-size: 0.62rem;
+}
+
+.lightbox-note {
+  font-size: 0.95rem;
+}
+
+.lightbox-download {
+  font-size: 0.62rem;
+}
+
+.lightbox-size {
+  font-size: 0.58rem;
+}
+
+.lightbox-hint {
+  font-size: 0.58rem;
+}
+
+.mobile-num {
+  font-size: 0.66rem;
+}
+
+.mobile-menu-footer {
+  font-size: 0.66rem;
+}
+
+html[lang="en"] .work-title {
+  font-size: clamp(1.15rem, 1.3vw, 1.35rem);
+}
+
+html[lang="en"] .selected-title {
+  font-size: clamp(1.15rem, 1.3vw, 1.3rem);
 }
 
 /* ---------- Responsive ---------- */
@@ -2127,7 +2364,7 @@ html[lang="en"] .selected-title {
   }
 
   .brand-en {
-    font-size: 0.44rem;
+    font-size: 0.5rem;
   }
 
   .hero {
@@ -2176,7 +2413,7 @@ html[lang="en"] .selected-title {
   .hero-lede {
     max-width: 92%;
     margin-top: 14px;
-    font-size: 0.82rem;
+    font-size: 0.95rem;
     line-height: 1.9;
   }
 
@@ -2186,7 +2423,7 @@ html[lang="en"] .selected-title {
 
   .btn {
     padding: 13px 17px;
-    font-size: 0.53rem;
+    font-size: 0.62rem;
   }
 
   .hero-scroll {
@@ -2206,7 +2443,7 @@ html[lang="en"] .selected-title {
   }
 
   .work-title {
-    font-size: 0.98rem;
+    font-size: 1rem;
   }
 
   .filter-bar {
@@ -2222,7 +2459,7 @@ html[lang="en"] .selected-title {
   }
 
   html[lang="en"] .hero-title-en {
-    font-size: clamp(3rem, 14vw, 4.6rem);
+    font-size: clamp(2.5rem, 13.4vw, 4.4rem);
   }
 
   .contact-title {
@@ -2240,7 +2477,7 @@ html[lang="en"] .selected-title {
   }
 
   .contact-value {
-    font-size: 0.68rem;
+    font-size: 0.92rem;
   }
 
   .about-facts {
@@ -2310,7 +2547,7 @@ html[lang="en"] .selected-title {
 @media (max-width: 420px) {
   .lang-toggle {
     gap: 5px;
-    font-size: 0.54rem;
+    font-size: 0.6rem;
   }
 
   .header-actions {
@@ -2323,7 +2560,7 @@ html[lang="en"] .selected-title {
 
   .btn {
     padding: 12px 14px;
-    font-size: 0.5rem;
+    font-size: 0.58rem;
   }
 
   .work-frame {
@@ -2333,7 +2570,7 @@ html[lang="en"] .selected-title {
 
 @media (max-width: 360px) {
   html[lang="en"] .hero-title-en {
-    font-size: clamp(2.3rem, 12.4vw, 2.7rem);
+    font-size: clamp(2rem, 12.4vw, 2.5rem);
     letter-spacing: 0.01em;
     white-space: nowrap;
   }
@@ -2343,7 +2580,11 @@ html[lang="en"] .selected-title {
   }
 
   .hero-lede {
-    font-size: 0.78rem;
+    font-size: 0.9rem;
+  }
+
+  .contact-value {
+    font-size: 0.8rem;
   }
 }
 

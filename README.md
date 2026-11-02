@@ -159,9 +159,9 @@ python tools/optimize_images.py "C:\path\to\your\photo.jpg"
 
 `about.html` 的文案目前是示範內容，建議換成你的真實簡介、展覽經歷與創作理念。
 
-### 字體粗細
+### 字體大小與粗細
 
-整體字重已從原本的 300 調到 400；英文大標使用 Cormorant Garamond 500。若你覺得還要更粗，可以把 `css/style.css` 裡的 `font-weight: 400` 再往上調成 500（中文）或 600（標題），英文標題可調到 600。
+整體字重已從原本的 300 調到 400；英文大標使用 Cormorant Garamond 500。網站字級基準為 20px，正文約 20px，小標籤約 11～13px。若你覺得還要更大，可以調整 `css/style.css` 裡的 `html { font-size: 20px; }`（會等比放大所有 rem 字級），或個別加大 `font-size`。若要更粗，可把 `font-weight: 400` 調成 500（中文）或 600（標題）。
 
 ## 部署到 GitHub Pages
 
