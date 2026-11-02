@@ -1,0 +1,45 @@
+<!--
+  WORK CARD TEMPLATE
+  ==================
+  1. Copy everything between <article> and </article> into works.html, inside #works-grid.
+  2. Replace XX with the new work number (e.g. 17).
+  3. Replace the Chinese/English titles, location, note, alt text and ARIA text.
+  4. Set data-featured="true" if it should appear in the 精選 filter.
+  5. Update the 全部 / 風景 / 精選 counts in the filter bar.
+  6. If it is a new category, add a filter button in works.html.
+-->
+
+<article class="work-card" data-id="XX" data-category="landscape" data-featured="false" data-year="2026"
+  data-title-zh="作品中文標題" data-title-en="English Title"
+  data-location-zh="澳門" data-location-en="Macau"
+  data-note-zh="用一兩句話描述這件作品。" data-note-en="One or two sentences about this photograph."
+  data-category-zh="風景" data-category-en="Landscape"
+  data-preview="assets/images/works/work-XX-1800.webp"
+  data-original="assets/images/originals/work-XX.jpg">
+  <button type="button" class="work-media" data-open-work
+    aria-label="檢視作品：作品中文標題"
+    data-aria-zh="檢視作品：作品中文標題"
+    data-aria-en="View work: English Title">
+    <img src="assets/images/works/work-XX-900.webp"
+      srcset="assets/images/works/work-XX-900.webp 900w, assets/images/works/work-XX-1800.webp 1800w"
+      sizes="(max-width: 700px) 100vw, (max-width: 900px) 50vw, (max-width: 1100px) 33vw, 25vw"
+      width="900" height="600" loading="lazy" decoding="async"
+      alt="作品中文標題"
+      data-alt-zh="作品中文標題"
+      data-alt-en="English Title">
+    <span class="work-shade" aria-hidden="true"></span>
+    <span class="work-tag"><span data-zh="風景" data-en="Landscape">風景</span></span>
+    <span class="work-frame" aria-hidden="true">FRAME XX</span>
+    <span class="work-open" aria-hidden="true">
+      <span data-zh="檢視" data-en="View">檢視</span>
+      <span class="work-open-arrow">↗</span>
+    </span>
+  </button>
+  <div class="work-info">
+    <div class="work-text">
+      <h3 class="work-title"><span data-zh="作品中文標題" data-en="English Title">作品中文標題</span></h3>
+      <p class="work-sub"><span data-zh="澳門 · 2026" data-en="Macau · 2026">澳門 · 2026</span></p>
+    </div>
+    <span class="work-index" aria-hidden="true">XX</span>
+  </div>
+</article>

@@ -58,6 +58,7 @@ photo-portfolio/
 │     ├─ originals/            # 16 張原始 JPG（不重新壓縮）
 │     └─ og-cover.jpg          # 社群分享預覽圖 1200 × 630
 ├─ tools/optimize_images.py    # 之後新增照片時可用的縮圖工具
+├─ tools/work-card-template.html # 新增作品時可複製的卡片模板
 ├─ .nojekyll                   # 告訴 GitHub Pages 不要跑 Jekyll
 └─ README.md
 ```
@@ -140,7 +141,7 @@ python tools/optimize_images.py "C:\path\to\your\photo.jpg"
 
 工具會產生 `work-XX-900.webp` 與 `work-XX-1800.webp` 到 `assets/images/works/`，並把原圖複製到 `assets/images/originals/`。你也可以直接用 Photoshop / Lightroom 輸出 900px 與 1800px 的 WebP。
 
-3. 在 `works.html` 複製一張 `<article>`，更新編號、資料屬性與圖片檔名。
+3. 在 `works.html` 複製一張 `<article>`，更新編號、資料屬性與圖片檔名。也可以直接複製 `tools/work-card-template.html` 裡的完整卡片模板。
 
 ### 社群與 Email
 
