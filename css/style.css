@@ -645,7 +645,7 @@ ul, ol {
   order: 1;
   font-family: var(--serif-zh);
   font-size: clamp(4rem, 10.2vw, 8.8rem);
-  font-weight: 300;
+  font-weight: 200;
   letter-spacing: 0.12em;
   line-height: 1;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55), 0 10px 70px rgba(0, 0, 0, 0.65);
