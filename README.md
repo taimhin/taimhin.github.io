@@ -2,8 +2,8 @@
 
 復古電影感 × 科技 HUD 風格的多頁攝影作品集。純 HTML / CSS / JavaScript，沒有框架、沒有建置步驟，可直接放在 GitHub Pages。
 
-> 線上網站：<https://taimhin.github.io/photo-portfolio/>  
-> GitHub repo：<https://github.com/taimhin/photo-portfolio>
+> 線上網站：<https://taimhin.github.io/>  
+> GitHub repo：<https://github.com/taimhin/taimhin.github.io>
 
 ## 頁面結構
 
@@ -168,14 +168,14 @@ python tools/optimize_images.py "C:\path\to\your\photo.jpg"
 
 ## 部署到 GitHub Pages
 
-網站已部署在 GitHub Pages：<https://taimhin.github.io/photo-portfolio/>。以下步驟保留作日後搬移 repo、重新部署或更換帳號時參考。
+網站已部署在 GitHub Pages：<https://taimhin.github.io/>。以下步驟保留作日後搬移 repo、重新部署或更換帳號時參考。
 
-1. 在 GitHub 建立 repository `photo-portfolio`（已建立）。
+1. 在 GitHub 建立 repository `taimhin.github.io`（已建立）。
 2. 在 PowerShell 執行：
 
 ```powershell
 cd C:\Users\tai\Desktop\photo-portfolio
-git remote add origin https://github.com/taimhin/photo-portfolio.git
+git remote add origin https://github.com/taimhin/taimhin.github.io.git
 git branch -M main
 git push -u origin main
 ```
@@ -186,7 +186,7 @@ git push -u origin main
 6. 等 1～3 分鐘，網站會在：
 
 ```text
-https://taimhin.github.io/photo-portfolio/
+https://taimhin.github.io/
 ```
 
 ### 部署後建議修改
@@ -194,8 +194,8 @@ https://taimhin.github.io/photo-portfolio/
 把 `index.html` 裡的社群預覽圖改成完整網址，否則 Facebook / LINE 等平台可能抓不到：
 
 ```html
-<meta property="og:image" content="https://taimhin.github.io/photo-portfolio/assets/images/og-cover.jpg">
-<meta name="twitter:image" content="https://taimhin.github.io/photo-portfolio/assets/images/og-cover.jpg">
+<meta property="og:image" content="https://taimhin.github.io/assets/images/og-cover.jpg">
+<meta name="twitter:image" content="https://taimhin.github.io/assets/images/og-cover.jpg">
 ```
 
 其他頁面（`works.html`、`about.html`、`contact.html`）也有同樣的 `og:image` 與 `twitter:image`，部署後可一併更新。
@@ -206,7 +206,7 @@ https://taimhin.github.io/photo-portfolio/
 
 ```powershell
 gh auth login
-gh repo create photo-portfolio --public --source=. --remote=origin --push
+gh repo create taimhin.github.io --public --source=. --remote=origin --push
 ```
 
 再到 Settings → Pages 開啟即可。
