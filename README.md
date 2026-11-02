@@ -1,4 +1,4 @@
-# 戴文軒 TAI MAN HIN — 攝影作品集
+# 戴文軒 TAI MAN HIN
 
 復古電影感 × 科技 HUD 風格的多頁攝影作品集。純 HTML / CSS / JavaScript，沒有框架、沒有建置步驟，可直接放在 GitHub Pages。
 
