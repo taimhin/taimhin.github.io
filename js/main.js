@@ -18,22 +18,41 @@
   const twitterTitle = $('meta[name="twitter:title"]');
   const twitterDescription = $('meta[name="twitter:description"]');
 
-  const pageMeta = {
-    zh: {
-      title: "戴文軒 TAI MAN HIN — 風景攝影 / Landscape Photography",
-      description: "戴文軒的風景攝影作品集，以長曝光記錄澳門煙花與夜色。十六個瞬間，收藏光線、煙霧與城市天際線交會的時刻。",
-      ogDescription: "以長曝光記錄澳門煙花與夜色。讓光停留，也讓時間有了形狀。"
-    },
-    en: {
-      title: "Tai Man Hin — Landscape Photography",
-      description: "A landscape photography portfolio by Tai Man Hin, capturing fireworks and night skies over Macau through long exposures.",
-      ogDescription: "Long exposures of fireworks and night skies over Macau. Where light lingers, time takes shape."
-    }
-  };
+  // The page-specific title/description lives on <body data-title-zh ...>.
+  // This keeps each page independently editable while sharing one script.
+  function getPageMeta(lang) {
+    const suffix = lang === "en" ? "En" : "Zh";
+    const title = body.dataset["title" + suffix] || document.title;
+    const description =
+      body.dataset["desc" + suffix] ||
+      (metaDescription ? metaDescription.getAttribute("content") : "");
+    return { title, description };
+  }
 
   function currentLang() {
     return root.lang === "en" ? "en" : "zh";
   }
+
+  // Lightbox elements are null on the home/about/contact pages.
+  const lightbox = $("#lightbox");
+  const lightboxImage = $("#lightbox-image");
+  const lightboxTitle = $("#lightbox-title");
+  const lightboxLocation = $("#lightbox-location");
+  const lightboxNote = $("#lightbox-note");
+  const lightboxCategory = $("#lightbox-category");
+  const lightboxYear = $("#lightbox-year");
+  const lightboxCounter = $("#lightbox-counter");
+  const lightboxQuality = $("#lightbox-quality");
+  const lightboxSize = $("#lightbox-size");
+  const lightboxDownload = $("#lightbox-download");
+  const lightboxClose = $(".lightbox-close");
+  const lightboxPrev = $(".lightbox-nav.prev");
+  const lightboxNext = $(".lightbox-nav.next");
+
+  let currentIndex = -1;
+  let lightboxTrigger = null;
+  let fullResToken = 0;
+  let visibleCards = [];
 
   function setLanguage(lang) {
     const normalized = lang === "en" ? "en" : "zh";
@@ -58,14 +77,14 @@
       button.setAttribute("aria-pressed", String(button.dataset.lang === normalized));
     });
 
-    const meta = pageMeta[normalized];
+    const meta = getPageMeta(normalized);
     document.title = meta.title;
     if (metaDescription) metaDescription.setAttribute("content", meta.description);
     if (ogTitle) ogTitle.setAttribute("content", meta.title);
-    if (ogDescription) ogDescription.setAttribute("content", meta.ogDescription);
+    if (ogDescription) ogDescription.setAttribute("content", meta.description);
     if (ogLocale) ogLocale.setAttribute("content", normalized === "en" ? "en_US" : "zh_TW");
     if (twitterTitle) twitterTitle.setAttribute("content", meta.title);
-    if (twitterDescription) twitterDescription.setAttribute("content", meta.ogDescription);
+    if (twitterDescription) twitterDescription.setAttribute("content", meta.description);
 
     try {
       localStorage.setItem("tmh-lang", normalized);
@@ -73,7 +92,7 @@
       /* localStorage can be blocked in private mode or on file:// */
     }
 
-    if (lightbox.open && currentIndex >= 0) {
+    if (lightbox && lightbox.open && currentIndex >= 0) {
       renderLightbox(currentIndex, { keepMedia: true });
     }
   }
@@ -91,14 +110,10 @@
   })();
 
   /* ---------------------------------------------------------
-     Header progress + active section
+     Header scroll progress
      --------------------------------------------------------- */
   const header = $(".site-header");
   const progressBar = $(".scroll-progress span");
-  const desktopNavLinks = $$(".desktop-nav a");
-  const sections = ["works", "about", "contact"]
-    .map((id) => document.getElementById(id))
-    .filter(Boolean);
   let scrollTicking = false;
 
   function updateOnScroll() {
@@ -110,22 +125,6 @@
     }
 
     if (header) header.classList.toggle("is-scrolled", y > 24);
-
-    let activeId = "";
-    sections.forEach((section) => {
-      if (section.getBoundingClientRect().top <= 160) activeId = section.id;
-    });
-
-    // Short final sections cannot always reach the 160px threshold; make the
-    // last section active when the page is scrolled to the bottom.
-    if (sections.length && window.innerHeight + y >= root.scrollHeight - 4) {
-      activeId = sections[sections.length - 1].id;
-    }
-
-    desktopNavLinks.forEach((link) => {
-      link.classList.toggle("is-active", link.getAttribute("href") === "#" + activeId);
-    });
-
     scrollTicking = false;
   }
 
@@ -150,8 +149,8 @@
   let menuIsOpen = false;
 
   function setMenu(open, options) {
-    const shouldFocus = !options || options.focus !== false;
     if (!mobileMenu || !menuToggle) return;
+    const shouldFocus = !options || options.focus !== false;
     menuIsOpen = open;
     mobileMenu.classList.toggle("is-open", open);
     mobileMenu.setAttribute("aria-hidden", String(!open));
@@ -223,12 +222,12 @@
   });
 
   /* ---------------------------------------------------------
-     Work filters
+     Work filters (works.html only)
      --------------------------------------------------------- */
   const worksGrid = $("#works-grid");
   const cards = worksGrid ? $$(".work-card", worksGrid) : [];
   const filterButtons = $$(".filter");
-  let visibleCards = cards.slice();
+  visibleCards = cards.slice();
 
   function cardMatchesFilter(card, filter) {
     if (filter === "all") return true;
@@ -237,7 +236,7 @@
   }
 
   function applyFilter(filter) {
-    if (lightbox.open) closeLightbox();
+    if (lightbox && lightbox.open) closeLightbox();
 
     filterButtons.forEach((button) => {
       const active = button.dataset.filter === filter;
@@ -257,28 +256,11 @@
   });
 
   /* ---------------------------------------------------------
-     Lightbox
+     Lightbox (works.html only)
      --------------------------------------------------------- */
-  const lightbox = $("#lightbox");
-  const lightboxImage = $("#lightbox-image");
-  const lightboxTitle = $("#lightbox-title");
-  const lightboxLocation = $("#lightbox-location");
-  const lightboxNote = $("#lightbox-note");
-  const lightboxCategory = $("#lightbox-category");
-  const lightboxYear = $("#lightbox-year");
-  const lightboxCounter = $("#lightbox-counter");
-  const lightboxQuality = $("#lightbox-quality");
-  const lightboxSize = $("#lightbox-size");
-  const lightboxDownload = $("#lightbox-download");
-  const lightboxClose = $(".lightbox-close");
-  const lightboxPrev = $(".lightbox-nav.prev");
-  const lightboxNext = $(".lightbox-nav.next");
-
-  let currentIndex = -1;
-  let lightboxTrigger = null;
-  let fullResToken = 0;
-
   function updateLightboxText(card) {
+    if (!lightbox || !card) return;
+
     const lang = currentLang();
     const img = card.querySelector(".work-media img");
     const title = lang === "en" ? card.dataset.titleEn : card.dataset.titleZh;
@@ -286,14 +268,16 @@
     const note = lang === "en" ? card.dataset.noteEn : card.dataset.noteZh;
     const category = lang === "en" ? card.dataset.categoryEn : card.dataset.categoryZh;
 
-    if (img) lightboxImage.alt = img.alt;
-    lightboxTitle.textContent = title || "";
-    lightboxLocation.textContent = location || "";
-    lightboxNote.textContent = note || "";
-    lightboxCategory.textContent = category || "";
-    lightboxYear.textContent = card.dataset.year || "";
-    lightboxCounter.textContent =
-      String(currentIndex + 1).padStart(2, "0") + " / " + String(visibleCards.length).padStart(2, "0");
+    if (img && lightboxImage) lightboxImage.alt = img.alt;
+    if (lightboxTitle) lightboxTitle.textContent = title || "";
+    if (lightboxLocation) lightboxLocation.textContent = location || "";
+    if (lightboxNote) lightboxNote.textContent = note || "";
+    if (lightboxCategory) lightboxCategory.textContent = category || "";
+    if (lightboxYear) lightboxYear.textContent = card.dataset.year || "";
+    if (lightboxCounter) {
+      lightboxCounter.textContent =
+        String(currentIndex + 1).padStart(2, "0") + " / " + String(visibleCards.length).padStart(2, "0");
+    }
 
     if (lightboxDownload) {
       lightboxDownload.href = card.dataset.original;
@@ -305,6 +289,7 @@
   }
 
   function renderLightbox(index, options) {
+    if (!lightbox || !lightboxImage) return;
     const settings = options || {};
     const card = visibleCards[index];
     if (!card) return;
@@ -322,9 +307,11 @@
     lightboxImage.src = card.dataset.preview || card.dataset.original;
     lightboxImage.width = 1800;
     lightboxImage.height = 1200;
-    lightboxQuality.textContent = "FULL RES…";
-    lightboxQuality.classList.add("is-loading");
-    lightboxQuality.classList.remove("is-full");
+    if (lightboxQuality) {
+      lightboxQuality.textContent = "FULL RES…";
+      lightboxQuality.classList.add("is-loading");
+      lightboxQuality.classList.remove("is-full");
+    }
     if (lightboxSize) lightboxSize.textContent = "6048 × 4032";
 
     const fullImage = new Image();
@@ -334,9 +321,11 @@
       if (token !== fullResToken) return;
       lightboxImage.src = fullImage.src;
       lightboxImage.classList.remove("is-loading");
-      lightboxQuality.textContent = "FULL RES";
-      lightboxQuality.classList.remove("is-loading");
-      lightboxQuality.classList.add("is-full");
+      if (lightboxQuality) {
+        lightboxQuality.textContent = "FULL RES";
+        lightboxQuality.classList.remove("is-loading");
+        lightboxQuality.classList.add("is-full");
+      }
       if (lightboxSize) {
         lightboxSize.textContent = fullImage.naturalWidth + " × " + fullImage.naturalHeight;
       }
@@ -345,14 +334,17 @@
     fullImage.onerror = () => {
       if (token !== fullResToken) return;
       lightboxImage.classList.remove("is-loading");
-      lightboxQuality.textContent = "PREVIEW";
-      lightboxQuality.classList.remove("is-loading", "is-full");
+      if (lightboxQuality) {
+        lightboxQuality.textContent = "PREVIEW";
+        lightboxQuality.classList.remove("is-loading", "is-full");
+      }
     };
 
     fullImage.src = card.dataset.original;
   }
 
   function openLightbox(card) {
+    if (!lightbox || !lightboxImage) return;
     const index = visibleCards.indexOf(card);
     if (index === -1) return;
 
@@ -368,12 +360,12 @@
   }
 
   function closeLightbox() {
-    if (!lightbox.open) return;
+    if (!lightbox || !lightbox.open) return;
     lightbox.close();
   }
 
   function navigateLightbox(direction) {
-    if (visibleCards.length < 2) return;
+    if (!lightbox || visibleCards.length < 2) return;
     const nextIndex = (currentIndex + direction + visibleCards.length) % visibleCards.length;
     renderLightbox(nextIndex);
   }
@@ -385,64 +377,66 @@
     }
   });
 
-  if (lightboxClose) lightboxClose.addEventListener("click", closeLightbox);
-  if (lightboxPrev) lightboxPrev.addEventListener("click", () => navigateLightbox(-1));
-  if (lightboxNext) lightboxNext.addEventListener("click", () => navigateLightbox(1));
+  if (lightbox) {
+    if (lightboxClose) lightboxClose.addEventListener("click", closeLightbox);
+    if (lightboxPrev) lightboxPrev.addEventListener("click", () => navigateLightbox(-1));
+    if (lightboxNext) lightboxNext.addEventListener("click", () => navigateLightbox(1));
 
-  lightbox.addEventListener("click", (event) => {
-    if (event.target === lightbox) closeLightbox();
-  });
+    lightbox.addEventListener("click", (event) => {
+      if (event.target === lightbox) closeLightbox();
+    });
 
-  lightbox.addEventListener("keydown", (event) => {
-    if (event.key === "ArrowLeft") {
-      event.preventDefault();
-      navigateLightbox(-1);
-    } else if (event.key === "ArrowRight") {
-      event.preventDefault();
-      navigateLightbox(1);
-    }
-  });
-
-  lightbox.addEventListener("close", () => {
-    root.classList.remove("lightbox-open");
-    fullResToken += 1;
-    if (lightboxTrigger) {
-      lightboxTrigger.focus({ preventScroll: true });
-      lightboxTrigger = null;
-    }
-  });
-
-  let touchStartX = null;
-  let touchStartY = null;
-
-  lightbox.addEventListener(
-    "touchstart",
-    (event) => {
-      const touch = event.changedTouches[0];
-      touchStartX = touch.clientX;
-      touchStartY = touch.clientY;
-    },
-    { passive: true }
-  );
-
-  lightbox.addEventListener(
-    "touchend",
-    (event) => {
-      if (touchStartX === null) return;
-      const touch = event.changedTouches[0];
-      const dx = touch.clientX - touchStartX;
-      const dy = touch.clientY - touchStartY;
-      touchStartX = null;
-      touchStartY = null;
-      if (Math.abs(dx) > 54 && Math.abs(dx) > Math.abs(dy)) {
-        navigateLightbox(dx > 0 ? -1 : 1);
+    lightbox.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        navigateLightbox(-1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        navigateLightbox(1);
       }
-    },
-    { passive: true }
-  );
+    });
+
+    lightbox.addEventListener("close", () => {
+      root.classList.remove("lightbox-open");
+      fullResToken += 1;
+      if (lightboxTrigger) {
+        lightboxTrigger.focus({ preventScroll: true });
+        lightboxTrigger = null;
+      }
+    });
+
+    let touchStartX = null;
+    let touchStartY = null;
+
+    lightbox.addEventListener(
+      "touchstart",
+      (event) => {
+        const touch = event.changedTouches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+      },
+      { passive: true }
+    );
+
+    lightbox.addEventListener(
+      "touchend",
+      (event) => {
+        if (touchStartX === null) return;
+        const touch = event.changedTouches[0];
+        const dx = touch.clientX - touchStartX;
+        const dy = touch.clientY - touchStartY;
+        touchStartX = null;
+        touchStartY = null;
+        if (Math.abs(dx) > 54 && Math.abs(dx) > Math.abs(dy)) {
+          navigateLightbox(dx > 0 ? -1 : 1);
+        }
+      },
+      { passive: true }
+    );
+  }
 
   /* ---------------------------------------------------------
-     Copy email
+     Copy email (contact.html only)
      --------------------------------------------------------- */
   const copyButton = $(".copy-email");
 
@@ -498,14 +492,7 @@
   }
 
   /* ---------------------------------------------------------
-     Small niceties
+     Apply the saved language once every element exists.
      --------------------------------------------------------- */
-  // Keep the footer year current without touching the design.
-  const yearTargets = $$("[data-current-year]");
-  yearTargets.forEach((element) => {
-    element.textContent = String(new Date().getFullYear());
-  });
-
-  // Now that the lightbox exists, apply the saved language without a TDZ error.
   setLanguage(savedLang === "en" ? "en" : "zh");
 })();
