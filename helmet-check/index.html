@@ -209,6 +209,7 @@
         <div class="block-h">DeepSeek 4.1 複核 <span style="color:var(--y)">· 需 API Key</span></div>
         <input class="keyfield" id="dsKey" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false" aria-label="DeepSeek API Key">
         <label class="checkline"><input type="checkbox" id="dsRemember"> 記住金鑰（只存在這台瀏覽器）</label>
+        <p class="hint" style="margin:0 0 8px">還沒有金鑰？<a class="link" href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">到 DeepSeek 平台取得</a></p>
         <button class="btn" id="dsBtn" type="button">用 DeepSeek 複核安全帽</button>
         <p class="status" id="dsStatus"><span class="dot"></span><span id="dsStatusText">金鑰只會直接送到 api.deepseek.com。GitHub Pages 無法隱藏站方金鑰，公開網站請由使用者自行輸入。</span></p>
         <div class="dsresult" id="dsSummary"></div>
@@ -868,7 +869,8 @@ HelmetDetect.init(MODEL_B64);
         if (gen !== detectGen || boxes !== snapshot) {
           throw new Error('偵測結果已更新，請再按一次 DeepSeek 複核');
         }
-        var results = Array.isArray(parsed.results) ? parsed.results : [];
+        var results = Array.isArray(parsed.results) ? parsed.results :
+          (Array.isArray(parsed) ? parsed : []);
         var byIndex = {};
         results.forEach(function (r) {
           if (r && r.index != null) byIndex[Number(r.index)] = r;
