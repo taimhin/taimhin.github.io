@@ -611,6 +611,13 @@ HelmetDetect.init(MODEL_B64);
     clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove('on'); }, 2400);
   }
   function setBusy(on) { $('busy').classList.toggle('on', on); }
+  function resetMode() {
+    mode = 'view';
+    [].forEach.call($('modes').children, function (b) {
+      b.classList.toggle('on', b.dataset.mode === 'view');
+    });
+    $('modeHint').textContent = '點一下框，可切換綠／紅。偵測不可能百分之百準確，請以人工覆核為準。';
+  }
 
   function aiStatus(state, text) {
     $('aiStatus').className = 'status' + (state ? ' ' + state : '');
@@ -947,7 +954,7 @@ HelmetDetect.init(MODEL_B64);
       $('drop').classList.add('hide'); $('view').classList.add('show');
       $('toolbar').style.display = 'flex';
       $('fileName').textContent = name;
-      boxes = []; sel = -1; detect(true);
+      boxes = []; sel = -1; resetMode(); detect(true);
     };
     im.onerror = function () { toast('這個檔案讀不進來，換一張試試。'); };
     im.src = url;
@@ -1290,6 +1297,7 @@ HelmetDetect.init(MODEL_B64);
   $('sampleBtn').addEventListener('click', function (e) { e.stopPropagation(); loadURL(SAMPLE_URL, '範例照片'); });
   $('resetBtn').addEventListener('click', function () {
     imgData = null; boxes = []; sel = -1; detectGen++; setBusy(false); aiSkipped = 0;
+    resetMode();
     $('view').classList.remove('show'); $('drop').classList.remove('hide');
     $('toolbar').style.display = 'none'; $('fileName').textContent = '尚未載入影像';
     $('nOk').textContent = '0'; $('nBad').textContent = '0'; $('note').textContent = ''; $('ms').textContent = '';
