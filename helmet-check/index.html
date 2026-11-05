@@ -958,6 +958,7 @@ HelmetDetect.init(MODEL_B64);
     boxes = list.map(function (b) {
       return { x: b.x, y: b.y, w: b.w, h: b.h, type: b.type, conf: b.conf, src: b.src || '', manual: false };
     }).concat(keep);
+    sel = -1;
     setBusy(false); draw(); stats();
   }
 
@@ -1131,13 +1132,18 @@ HelmetDetect.init(MODEL_B64);
   }
 
   function hit(p) {
+    var pad = Math.max(3, cv.width / 280);
     var best = -1, bestArea = Infinity;
     for (var i = 0; i < boxes.length; i++) {
       var b = boxes[i];
-      if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
-        var a = b.w * b.h;
-        if (a < bestArea) { bestArea = a; best = i; }
-      }
+      var inBox = p.x >= b.x - pad && p.x <= b.x + b.w + pad &&
+        p.y >= b.y - pad && p.y <= b.y + b.h + pad;
+      var inLabel = b._lx != null && p.x >= b._lx && p.x <= b._lx + b._lw &&
+        p.y >= b._ly && p.y <= b._ly + b._lh;
+      if (!inBox && !inLabel) continue;
+      if (i === sel) return i;
+      var a = b.w * b.h;
+      if (a < bestArea) { bestArea = a; best = i; }
     }
     return best;
   }
@@ -1159,6 +1165,7 @@ HelmetDetect.init(MODEL_B64);
     var tw = g.measureText(text).width + fs * 1.1, th = Math.round(fs * 1.8);
     var ty = b.y - th - lw;
     if (ty < 0) ty = b.y + lw;
+    b._lx = b.x; b._ly = ty; b._lw = tw + ((b.manual || b.ds) ? fs * 4.5 : 0); b._lh = th;
     g.fillStyle = col;
     g.fillRect(b.x, ty, tw, th);
     g.fillStyle = b.type ? '#04160e' : '#ffffff';
@@ -1212,7 +1219,7 @@ HelmetDetect.init(MODEL_B64);
   }
   ov.addEventListener('pointerdown', function (e) {
     if (!imgData) return;
-    ov.setPointerCapture(e.pointerId);
+    try { ov.setPointerCapture(e.pointerId); } catch (err) {}
     var p = toImg(e);
     if (mode === 'add') { drag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y }; return; }
     var i = hit(p);
@@ -1245,7 +1252,16 @@ HelmetDetect.init(MODEL_B64);
     [].forEach.call(this.children, function (b) { b.classList.toggle('on', b === btn); });
     $('modeHint').textContent = mode === 'add'
       ? '在影像上拖曳出一個框（預設紅框），標記漏抓的人員。'
-      : mode === 'del' ? '點一下框即可刪除。' : '點一下框，可切換綠／紅。';
+      : mode === 'del' ? '點一下框或框上方的標籤即可刪除；已選取的框會立即刪除。' : '點一下框，可切換綠／紅。';
+    if (mode === 'del') {
+      if (sel >= 0) {
+        boxes.splice(sel, 1); sel = -1;
+        draw(); stats();
+        toast('已刪除選取的框。');
+      } else {
+        toast('點一下要刪除的框。');
+      }
+    }
   });
 
   $('aiBtn').addEventListener('click', function () {
@@ -1297,8 +1313,11 @@ HelmetDetect.init(MODEL_B64);
   });
 
   document.addEventListener('keydown', function (e) {
-    if ((e.key === 'Delete' || e.key === 'Backspace') && sel >= 0) {
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+    if ((e.key === 'Delete' || e.key === 'Backspace') && sel >= 0 && sel < boxes.length) {
       boxes.splice(sel, 1); sel = -1; draw(); stats(); e.preventDefault();
+      toast('已刪除選取的框。');
     }
   });
 
