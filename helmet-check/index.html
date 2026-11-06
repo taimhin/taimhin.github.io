@@ -210,6 +210,7 @@
         <input class="keyfield" id="dsKey" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false" aria-label="DeepSeek API Key">
         <label class="checkline"><input type="checkbox" id="dsRemember"> 記住金鑰（只存在這台瀏覽器）</label>
         <p class="hint" id="dsKeyHint" style="margin:0 0 8px">還沒有金鑰？<a class="link" href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">到 DeepSeek 平台取得</a></p>
+        <label class="checkline"><input type="checkbox" id="dsAuto" checked> 載入照片後自動複核（會使用 API 額度）</label>
         <button class="btn" id="dsBtn" type="button">用 DeepSeek 複核安全帽</button>
         <p class="status" id="dsStatus"><span class="dot"></span><span id="dsStatusText">金鑰只會直接送到 api.deepseek.com。GitHub Pages 無法隱藏站方金鑰，公開網站請由使用者自行輸入。</span></p>
         <div class="dsresult" id="dsSummary"></div>
@@ -604,7 +605,10 @@ HelmetDetect.init(MODEL_B64);
   var DS_API_URL = 'https://api.deepseek.com/chat/completions';
   var DS_MODEL = 'deepseek-flash';
   var DS_KEY_STORAGE = 'helmet-check.deepseek-key';
-  var dsBusy = false;
+  var AUTO_DS_STORAGE = 'helmet-check.deepseek-auto';
+  var AI_MODE_STORAGE = 'helmet-check.ai-enabled';
+  var DS_DEFAULT_STATUS = '金鑰只會直接送到 api.deepseek.com。GitHub Pages 無法隱藏站方金鑰，公開網站請由使用者自行輸入。';
+  var dsBusy = false, autoDsPending = false;
 
   function toast(msg) {
     var t = $('toast'); t.textContent = msg; t.classList.add('on');
@@ -703,6 +707,7 @@ HelmetDetect.init(MODEL_B64);
       await ensureAI();
       ai.enabled = true;
       setEngine(true);
+      try { localStorage.setItem(AI_MODE_STORAGE, '1'); } catch (e) {}
       $('aiBtn').textContent = '關閉 AI 偵測（回離線模式）';
       aiStatus('on', 'AI 模式已啟用：YOLOv8 安全帽模型。照片仍只在瀏覽器內處理。');
       detect(true);
@@ -713,10 +718,12 @@ HelmetDetect.init(MODEL_B64);
       toast('AI 模型載入失敗，已保留離線模式。');
     } finally {
       ai.loading = false; $('aiBtn').disabled = false;
+      maybeAutoDeepSeek();
     }
   }
   function stopAI() {
     ai.enabled = false; setEngine(false); aiSkipped = 0;
+    try { localStorage.setItem(AI_MODE_STORAGE, '0'); } catch (e) {}
     $('aiBtn').textContent = ai.session ? '重新啟用 AI 模型' : '下載並啟用 AI 模型';
     aiStatus('', '已回到離線啟發式模式。可隨時再次啟用 AI。');
     detect(true);
@@ -726,6 +733,10 @@ HelmetDetect.init(MODEL_B64);
   function dsStatus(state, text) {
     $('dsStatus').className = 'status' + (state ? ' ' + state : '');
     $('dsStatusText').textContent = text;
+  }
+  function clearDeepSeekResult() {
+    $('dsSummary').textContent = '';
+    dsStatus('', DS_DEFAULT_STATUS);
   }
   function readSavedKey() {
     try { return localStorage.getItem(DS_KEY_STORAGE) || ''; } catch (e) { return ''; }
@@ -845,12 +856,15 @@ HelmetDetect.init(MODEL_B64);
 
   async function reviewWithDeepSeek() {
     if (dsBusy) return;
+    if ($('busy').classList.contains('on')) { toast('等照片分析完成後再按。'); return; }
     if (!imgData) { toast('先載入一張照片。'); return; }
     if (!$('dsKey').value.trim()) {
+      autoDsPending = false;
       dsStatus('err', '請先輸入 DeepSeek API Key。金鑰只會送到 api.deepseek.com。');
       $('dsKey').focus();
       return;
     }
+    autoDsPending = false;
 
     var gen = detectGen, snapshot = boxes, targetInfo = deepSeekTargets(), targets = targetInfo.list;
     var savedSummary = '', summary = '';
@@ -940,7 +954,24 @@ HelmetDetect.init(MODEL_B64);
       $('dsBtn').disabled = false;
       $('busy').textContent = '分析中…';
       setBusy(false);
+      maybeAutoDeepSeek();
     }
+  }
+
+  function maybeAutoDeepSeek() {
+    if (!autoDsPending) return;
+    if (dsBusy) return;
+    if (ai.loading) return;
+    if ($('busy').classList.contains('on')) return;
+    if (!$('dsAuto') || !$('dsAuto').checked) { autoDsPending = false; return; }
+    if (!$('dsKey').value.trim()) {
+      autoDsPending = false;
+      dsStatus('', '照片已載入。輸入 DeepSeek API Key 後，可按「用 DeepSeek 複核安全帽」。');
+      return;
+    }
+    if (!imgData) { autoDsPending = false; return; }
+    autoDsPending = false;
+    reviewWithDeepSeek();
   }
 
   function loadURL(url, name) {
@@ -954,7 +985,7 @@ HelmetDetect.init(MODEL_B64);
       $('drop').classList.add('hide'); $('view').classList.add('show');
       $('toolbar').style.display = 'flex';
       $('fileName').textContent = name;
-      boxes = []; sel = -1; resetMode(); detect(true);
+      boxes = []; sel = -1; resetMode(); clearDeepSeekResult(); autoDsPending = true; detect(true);
     };
     im.onerror = function () { toast('這個檔案讀不進來，換一張試試。'); };
     im.src = url;
@@ -967,6 +998,7 @@ HelmetDetect.init(MODEL_B64);
     }).concat(keep);
     sel = -1;
     setBusy(false); draw(); stats();
+    maybeAutoDeepSeek();
   }
 
   function iou(a, b) {
@@ -1287,6 +1319,26 @@ HelmetDetect.init(MODEL_B64);
   }
   updateKeyHint();
 
+  var autoPref = '1';
+  try { autoPref = localStorage.getItem(AUTO_DS_STORAGE) || '1'; } catch (e) {}
+  $('dsAuto').checked = autoPref !== '0';
+  $('dsAuto').addEventListener('change', function () {
+    try { localStorage.setItem(AUTO_DS_STORAGE, this.checked ? '1' : '0'); } catch (e) {}
+    if (!this.checked) {
+      autoDsPending = false;
+      return;
+    }
+    var wasAI = false;
+    try { wasAI = localStorage.getItem(AI_MODE_STORAGE) === '1'; } catch (e) {}
+    if (wasAI && $('dsKey').value.trim() && !ai.enabled && !ai.loading) startAILoad();
+  });
+
+  var aiWasEnabled = false;
+  try { aiWasEnabled = localStorage.getItem(AI_MODE_STORAGE) === '1'; } catch (e) {}
+  if (aiWasEnabled && $('dsAuto').checked && $('dsKey').value.trim()) {
+    startAILoad();
+  }
+
   $('sens').addEventListener('input', function () {
     clearTimeout(window._sd);
     window._sd = setTimeout(function () { detect(false); }, 320);
@@ -1298,6 +1350,7 @@ HelmetDetect.init(MODEL_B64);
   $('resetBtn').addEventListener('click', function () {
     imgData = null; boxes = []; sel = -1; detectGen++; setBusy(false); aiSkipped = 0;
     resetMode();
+    clearDeepSeekResult();
     $('view').classList.remove('show'); $('drop').classList.remove('hide');
     $('toolbar').style.display = 'none'; $('fileName').textContent = '尚未載入影像';
     $('nOk').textContent = '0'; $('nBad').textContent = '0'; $('note').textContent = ''; $('ms').textContent = '';
