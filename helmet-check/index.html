@@ -96,6 +96,9 @@
   .batchtop{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
   .batchtop .block-h{margin:0}
   .batchactions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .batchspeed{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);white-space:nowrap}
+  .batchspeed select{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);
+    font:inherit;font-size:11.5px;padding:4px 6px;border-radius:2px;color-scheme:dark}
   .btn-sm{width:auto;padding:5px 10px;font-size:12px}
   .batchsummary{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.02em}
   .batchlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
@@ -296,6 +299,14 @@
     <div class="batchtop">
       <div><span class="block-h" style="margin:0">批次分析</span> <span class="batchsummary" id="batchSummary"></span></div>
       <div class="batchactions">
+        <label class="batchspeed">播放速度
+          <select id="batchSpeed">
+            <option value="0">連續</option>
+            <option value="800">快 0.8 秒</option>
+            <option value="2000" selected>慢 2 秒</option>
+            <option value="3500">很慢 3.5 秒</option>
+          </select>
+        </label>
         <button class="btn btn-sm" id="batchPause" type="button" style="display:none">暫停</button>
         <button class="btn btn-sm" id="batchRestart" type="button" style="display:none">重新開始</button>
         <button class="link" id="batchClear" type="button">清除批次</button>
@@ -681,6 +692,7 @@ HelmetDetect.init(MODEL_B64);
   var AUTO_DS_STORAGE = 'helmet-check.deepseek-auto';
   var AI_MODE_STORAGE = 'helmet-check.ai-enabled';
   var DS_ONLY_STORAGE = 'helmet-check.deepseek-only';
+  var BATCH_SPEED_STORAGE = 'helmet-check.batch-speed';
   var DS_DEFAULT_STATUS = '金鑰只會直接送到 api.deepseek.com。GitHub Pages 無法隱藏站方金鑰，公開網站請由使用者自行輸入。';
   var dsBusy = false, autoDsPending = false, dsOnly = false, dsOnlyResult = null;
 
@@ -1238,6 +1250,18 @@ HelmetDetect.init(MODEL_B64);
     restart.disabled = batchProcessing;
     updateBatchSummary();
   }
+  function batchSleep(ms) {
+    if (!ms) return Promise.resolve();
+    return new Promise(function (resolve) {
+      var start = Date.now();
+      var timer = setInterval(function () {
+        if (batchPaused || Date.now() - start >= ms) {
+          clearInterval(timer);
+          resolve();
+        }
+      }, 120);
+    });
+  }
   async function processBatchQueue() {
     if (batchProcessing || batchPaused) return;
     var hasPending = batchItems.some(function (i) { return i.status === 'pending'; });
@@ -1307,6 +1331,10 @@ HelmetDetect.init(MODEL_B64);
           item.error = err && err.message ? err.message : '分析失敗';
         }
         renderBatch();
+        if (batchPaused) break;
+        if (batchItems.some(function (i) { return i.status === 'pending'; })) {
+          await batchSleep(+$('batchSpeed').value || 0);
+        }
         if (batchPaused) break;
       }
     } finally {
@@ -2054,6 +2082,13 @@ HelmetDetect.init(MODEL_B64);
     }
   });
   $('batchRestart').addEventListener('click', restartBatch);
+  var speedPref = '2000';
+  try { speedPref = localStorage.getItem(BATCH_SPEED_STORAGE) || '2000'; } catch (e) {}
+  var speedSel = $('batchSpeed');
+  if ([].some.call(speedSel.options, function (o) { return o.value === speedPref; })) speedSel.value = speedPref;
+  speedSel.addEventListener('change', function () {
+    try { localStorage.setItem(BATCH_SPEED_STORAGE, this.value); } catch (e) {}
+  });
 
   ['dragenter', 'dragover'].forEach(function (ev) {
     document.addEventListener(ev, function (e) { e.preventDefault(); $('drop').classList.add('over'); });
