@@ -92,6 +92,30 @@
   .ratebar i{display:block;height:100%;width:0;background:var(--y);transition:width .25s,background .25s}
   .rateblock .hint{margin:8px 0 0}
 
+  .batchpanel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:2px;padding:14px 16px}
+  .batchtop{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+  .batchtop .block-h{margin:0}
+  .batchsummary{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.02em}
+  .batchlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+  .batchcard{border:1px solid var(--line2);background:var(--panel2);border-radius:2px;overflow:hidden;
+    cursor:pointer;transition:border-color .15s}
+  .batchcard:hover{border-color:var(--dim)}
+  .batchcard.sel{border-color:var(--y)}
+  .batchcard img{display:block;width:100%;height:100px;object-fit:cover;background:#07090c}
+  .batchcard .bcbody{padding:8px 9px}
+  .batchcard .bcname{font-family:var(--mono);font-size:10.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .batchcard .bcmeta{display:flex;gap:8px;font-size:11px;color:var(--muted);margin-top:4px;flex-wrap:wrap}
+  .batchcard .bcrates{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:4px;line-height:1.45}
+  .batchcard .bcstatus{font-size:10.5px;color:var(--dim);margin-top:4px}
+  .batchcard.processing{border-color:var(--y)}
+  .batchcard.error{border-color:var(--r)}
+  .batchcard .ok{color:var(--g)} .batchcard .bad{color:var(--r)}
+  body.batch-running #modes, body.batch-running #sens, body.batch-running #aiBtn, body.batch-running #dsBtn,
+  body.batch-running #exportBtn, body.batch-running #resetBtn, body.batch-running #pick, body.batch-running #sampleBtn,
+  body.batch-running #batchBtn, body.batch-running #batchClear, body.batch-running #dsKey, body.batch-running #dsRemember,
+  body.batch-running #dsAuto { opacity:.5; pointer-events:none }
+  body.batch-running #ov { pointer-events:none }
+
   .block{padding:14px 16px;border-bottom:1px solid var(--line)}
   .block:last-child{border-bottom:0}
   .block-h{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
@@ -174,9 +198,10 @@
           <path d="M22 21c1.5-5 5-8 10-8s8.5 3 10 8" stroke="#8592a5" stroke-width="2.5"/>
         </svg>
         <p class="dtitle">拖曳照片到這裡</p>
-        <p class="dsub">或 <button class="link" id="pick" type="button">選擇檔案</button>　·　也可以直接貼上（Ctrl / ⌘ + V）</p>
+        <p class="dsub">或 <button class="link" id="pick" type="button">選擇檔案</button>　·　也可以直接貼上（Ctrl / ⌘ + V）<br>可一次拖曳多張照片，自動批次分析</p>
         <p class="dmeta">JPG · PNG · WEBP　／　建議人物高度至少佔畫面 1/8</p>
         <button class="btn" id="sampleBtn" style="max-width:220px;margin:0 auto">載入範例照片</button>
+        <button class="btn" id="batchBtn" type="button" style="max-width:220px;margin:8px auto 0">批次分析多張照片</button>
       </div>
 
       <div class="view" id="view">
@@ -256,6 +281,14 @@
       <p id="note"></p>
     </aside>
   </div>
+
+  <section class="batchpanel" id="batchPanel" style="display:none">
+    <div class="batchtop">
+      <div><span class="block-h" style="margin:0">批次分析</span> <span class="batchsummary" id="batchSummary"></span></div>
+      <button class="link" id="batchClear" type="button">清除批次</button>
+    </div>
+    <div class="batchlist" id="batchList"></div>
+  </section>
 
   <footer>
     <b>運作方式與限制</b>　影像先在瀏覽器內縮到 1400px，再用「安全帽色彩／形狀」加上「人臉偵測」兩項特徵做啟發式判斷：
@@ -616,7 +649,8 @@ HelmetDetect.init(MODEL_B64);
   var cv = $('cv'), ov = $('ov'), ctx = cv.getContext('2d'), octx = ov.getContext('2d');
   var imgData = null, boxes = [], mode = 'view', drag = null, sel = -1;
   var detectGen = 0, aiSkipped = 0;
-  var ai = { session: null, inputName: '', outputName: '', loading: false, enabled: false, libs: null, pre: null };
+  var batchItems = [], batchProcessing = false, batchMode = false, batchSelected = -1;
+  var ai = { session: null, inputName: '', outputName: '', loading: false, enabled: false, libs: null, pre: null, waiters: [] };
   /* Optional AI mode: YOLOv8 helmet detector (Hardhat / NO-Hardhat / Person), AGPL-3.0,
      loaded from jsDelivr with ONNX Runtime Web (MIT). Image bytes never leave the page. */
   var AI_ORT_URL = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.2/dist/ort.wasm.min.js';
@@ -720,7 +754,7 @@ HelmetDetect.init(MODEL_B64);
     $('engineBadge').classList.toggle('ai', useAI);
   }
   async function startAILoad() {
-    if (ai.loading) return;
+    if (ai.loading) return new Promise(function (resolve) { ai.waiters.push(resolve); });
     ai.loading = true;
     $('aiBtn').disabled = true;
     $('aiBtn').textContent = '下載中…';
@@ -740,6 +774,7 @@ HelmetDetect.init(MODEL_B64);
       toast('AI 模型載入失敗，已保留離線模式。');
     } finally {
       ai.loading = false; $('aiBtn').disabled = false;
+      (ai.waiters || []).splice(0).forEach(function (fn) { fn(); });
       maybeAutoDeepSeek();
     }
   }
@@ -990,6 +1025,7 @@ HelmetDetect.init(MODEL_B64);
   }
 
   function maybeAutoDeepSeek() {
+    if (batchMode) return;
     if (!autoDsPending) return;
     if (dsBusy) return;
     if (ai.loading) return;
@@ -1005,21 +1041,225 @@ HelmetDetect.init(MODEL_B64);
     reviewWithDeepSeek();
   }
 
+  /* ---------- batch photos ---------- */
+  function cloneBoxList(list) {
+    return list.map(function (b) {
+      return {
+        x: b.x, y: b.y, w: b.w, h: b.h, type: b.type,
+        conf: b.conf, personConf: b.personConf == null ? null : b.personConf,
+        helmetConf: b.helmetConf == null ? null : b.helmetConf,
+        src: b.src || '', manual: !!b.manual
+      };
+    });
+  }
+  function countBoxes(list) {
+    var ok = 0, bad = 0;
+    list.forEach(function (b) { if (b.type) ok++; else bad++; });
+    return { ok: ok, bad: bad };
+  }
+  function updateBatchSummary() {
+    if (!batchItems.length) {
+      $('batchSummary').textContent = '';
+      return;
+    }
+    var done = batchItems.filter(function (i) { return i.status === 'done'; });
+    var pSum = 0, pN = 0, hSum = 0, hN = 0;
+    done.forEach(function (i) {
+      if (i.rates && i.rates.p != null) { pSum += i.rates.p; pN++; }
+      if (i.rates && i.rates.h != null) { hSum += i.rates.h; hN++; }
+    });
+    var text = '共 ' + batchItems.length + ' 張（完成 ' + done.length + '）';
+    if (batchProcessing) text += ' · 分析中…';
+    if (pN) text += ' · 人物平均 ' + Math.round(pSum / pN * 100) + '%';
+    if (hN) text += ' · 安全帽平均 ' + Math.round(hSum / hN * 100) + '%';
+    if (done.length && !pN && !hN) text += ' · 尚無識別率';
+    $('batchSummary').textContent = text;
+    $('batchSummary').title = pN || hN ? '照片平均：每張照片先取平均，再對照片取平均' : '';
+  }
+  function renderBatch() {
+    if (!batchItems.length) {
+      $('batchPanel').style.display = 'none';
+      $('batchList').textContent = '';
+      $('batchSummary').textContent = '';
+      return;
+    }
+    $('batchPanel').style.display = 'block';
+    var list = $('batchList');
+    list.textContent = '';
+    batchItems.forEach(function (item, idx) {
+      var card = document.createElement('div');
+      card.className = 'batchcard' +
+        (idx === batchSelected ? ' sel' : '') +
+        (item.status === 'processing' ? ' processing' : '') +
+        (item.status === 'error' ? ' error' : '');
+      var img = document.createElement('img');
+      img.src = item.url; img.alt = ''; img.loading = 'lazy';
+      card.appendChild(img);
+      var body = document.createElement('div'); body.className = 'bcbody';
+      var name = document.createElement('div'); name.className = 'bcname'; name.textContent = item.name;
+      body.appendChild(name);
+      var meta = document.createElement('div'); meta.className = 'bcmeta';
+      if (item.counts) {
+        var ok = document.createElement('span'); ok.className = 'ok'; ok.textContent = '有戴 ' + item.counts.ok;
+        var bad = document.createElement('span'); bad.className = 'bad'; bad.textContent = '未戴 ' + item.counts.bad;
+        meta.appendChild(ok); meta.appendChild(bad);
+      }
+      body.appendChild(meta);
+      var rates = document.createElement('div'); rates.className = 'bcrates';
+      if (item.rates && (item.rates.p != null || item.rates.h != null)) {
+        var parts = [];
+        if (item.rates.p != null) parts.push('人物 ' + Math.round(item.rates.p * 100) + '%');
+        if (item.rates.h != null) parts.push('安全帽 ' + Math.round(item.rates.h * 100) + '%');
+        rates.textContent = parts.join(' · ');
+      } else if (item.status === 'done') {
+        rates.textContent = '識別率 —';
+      }
+      body.appendChild(rates);
+      var status = document.createElement('div'); status.className = 'bcstatus';
+      if (item.status === 'done') {
+        status.textContent = item.dsUsed ? (item.dsError ? '完成（DeepSeek 失敗）' : '完成（含 DeepSeek）') : '完成';
+      } else if (item.status === 'processing') {
+        status.textContent = '分析中…';
+      } else if (item.status === 'error') {
+        status.textContent = item.error || '分析失敗';
+      } else {
+        status.textContent = '等待中…';
+      }
+      body.appendChild(status);
+      card.appendChild(body);
+      card.addEventListener('click', function () { selectBatchItem(idx); });
+      list.appendChild(card);
+    });
+    updateBatchSummary();
+  }
+  async function processBatchQueue() {
+    if (batchProcessing) return;
+    var hasPending = batchItems.some(function (i) { return i.status === 'pending'; });
+    if (!hasPending) return;
+    batchProcessing = true; batchMode = true;
+    document.body.classList.add('batch-running');
+    $('batchBtn').disabled = true;
+    try {
+      if (!ai.enabled) {
+        try { await startAILoad(); } catch (e) {}
+      }
+      for (var i = 0; i < batchItems.length; i++) {
+        var item = batchItems[i];
+        if (item.status !== 'pending') continue;
+        item.status = 'processing';
+        renderBatch();
+        try {
+          await showImage(item.url, item.name);
+          var res = await detect(true);
+          if (!res) throw new Error('偵測失敗');
+          var useDS = $('dsAuto').checked && !!$('dsKey').value.trim();
+          if (useDS) {
+            await reviewWithDeepSeek();
+            item.dsUsed = true;
+            item.dsError = $('dsStatus').classList.contains('err');
+          }
+          item.boxes = cloneBoxList(boxes);
+          item.rates = computeRates(boxes);
+          item.counts = countBoxes(boxes);
+          item.ms = $('ms').textContent;
+          item.summary = $('dsSummary').textContent;
+          item.dsStatus = $('dsStatusText').textContent;
+          item.status = 'done';
+          batchSelected = i;
+        } catch (err) {
+          console.error(err);
+          item.status = 'error';
+          item.error = err && err.message ? err.message : '分析失敗';
+        }
+        renderBatch();
+      }
+    } finally {
+      batchProcessing = false; batchMode = false;
+      document.body.classList.remove('batch-running');
+      $('batchBtn').disabled = false;
+      renderBatch();
+    }
+  }
+  function addBatchFiles(fileList) {
+    if (batchProcessing) { toast('批次分析中，請稍候。'); return; }
+    var files = Array.prototype.slice.call(fileList || []).filter(function (f) {
+      return f && f.type && f.type.indexOf('image/') === 0;
+    });
+    if (!files.length) { toast('請選擇圖片檔案。'); return; }
+    if (batchItems.length + files.length > 30) {
+      files = files.slice(0, Math.max(0, 30 - batchItems.length));
+      toast('一次最多 30 張照片。');
+    }
+    if (!files.length) return;
+    var key = $('dsKey').value.trim();
+    if (files.length > 1 && key && $('dsAuto').checked) {
+      if (!confirm('將分析 ' + files.length + ' 張照片，並自動使用 DeepSeek 複核；會產生 API 費用。要繼續嗎？')) return;
+    }
+    files.forEach(function (f) {
+      batchItems.push({
+        url: URL.createObjectURL(f), name: f.name, status: 'pending',
+        counts: null, rates: null, boxes: null, dsUsed: false, dsError: false,
+        summary: '', dsStatus: '', ms: '', error: ''
+      });
+    });
+    batchSelected = -1;
+    renderBatch();
+    processBatchQueue();
+  }
+  function selectBatchItem(idx) {
+    if (batchProcessing) return;
+    var item = batchItems[idx];
+    if (!item || item.status !== 'done') return;
+    batchSelected = idx;
+    renderBatch();
+    showImage(item.url, item.name).then(function () {
+      boxes = cloneBoxList(item.boxes || []);
+      sel = -1;
+      autoDsPending = false;
+      if (item.dsStatus) dsStatus('', item.dsStatus); else clearDeepSeekResult();
+      $('dsSummary').textContent = item.summary || '';
+      $('ms').textContent = item.ms || '';
+      draw(); stats();
+    }).catch(function () { toast('這張照片讀不進來。'); });
+  }
+  function clearBatch() {
+    if (batchProcessing) { toast('批次分析中，請稍候。'); return; }
+    batchItems.forEach(function (i) { try { URL.revokeObjectURL(i.url); } catch (e) {} });
+    batchItems = []; batchSelected = -1;
+    renderBatch();
+  }
+
+  function showImage(url, name) {
+    return new Promise(function (resolve, reject) {
+      var im = new Image();
+      im.onload = function () {
+        var MAX = 1400, sc = Math.min(1, MAX / Math.max(im.width, im.height));
+        var w = Math.round(im.width * sc), h = Math.round(im.height * sc);
+        cv.width = w; cv.height = h; ov.width = w; ov.height = h;
+        ctx.drawImage(im, 0, 0, w, h);
+        imgData = ctx.getImageData(0, 0, w, h);
+        $('drop').classList.add('hide'); $('view').classList.add('show');
+        $('toolbar').style.display = 'flex';
+        $('fileName').textContent = name;
+        boxes = []; sel = -1; autoDsPending = false;
+        resetMode(); clearDeepSeekResult();
+        resolve({ width: w, height: h });
+      };
+      im.onerror = function () { reject(new Error('這個檔案讀不進來')); };
+      im.src = url;
+    });
+  }
+
   function loadURL(url, name) {
-    var im = new Image();
-    im.onload = function () {
-      var MAX = 1400, sc = Math.min(1, MAX / Math.max(im.width, im.height));
-      var w = Math.round(im.width * sc), h = Math.round(im.height * sc);
-      cv.width = w; cv.height = h; ov.width = w; ov.height = h;
-      ctx.drawImage(im, 0, 0, w, h);
-      imgData = ctx.getImageData(0, 0, w, h);
-      $('drop').classList.add('hide'); $('view').classList.add('show');
-      $('toolbar').style.display = 'flex';
-      $('fileName').textContent = name;
-      boxes = []; sel = -1; resetMode(); clearDeepSeekResult(); autoDsPending = true; detect(true);
-    };
-    im.onerror = function () { toast('這個檔案讀不進來，換一張試試。'); };
-    im.src = url;
+    if (batchProcessing) { toast('批次分析中，請稍候。'); return; }
+    showImage(url, name).then(function () {
+      batchSelected = -1;
+      if (batchItems.length) renderBatch();
+      autoDsPending = true;
+      detect(true);
+    }).catch(function () {
+      toast('這個檔案讀不進來，換一張試試。');
+    });
   }
 
   function applyResult(list, fresh) {
@@ -1167,45 +1407,50 @@ HelmetDetect.init(MODEL_B64);
   }
 
   function detect(fresh) {
-    if (!imgData) return;
-    var gen = ++detectGen;
-    setBusy(true);
-    setTimeout(function () {
-      if (gen !== detectGen) return;
-      var t0 = performance.now();
-      var sens = (+$('sens').value) / 100;
-      var useAI = !!(ai.enabled && ai.session);
-      var run;
-      if (useAI) {
-        aiSkipped = 0;
-        run = runAI(sens);
-      } else {
-        aiSkipped = 0;
-        run = Promise.resolve(HelmetDetect.analyze(imgData.data, imgData.width, imgData.height,
-          { sensitivity: sens }).boxes);
-      }
-      Promise.resolve(run).then(function (res) {
-        if (gen !== detectGen || !res) return;
-        applyResult(res, fresh);
-        $('ms').textContent = (useAI ? 'AI 分析 ' : '分析 ') + Math.round(performance.now() - t0) + ' ms';
-      }).catch(function (err) {
-        if (gen !== detectGen) return;
-        console.error(err);
+    return new Promise(function (resolve) {
+      if (!imgData) { resolve(null); return; }
+      var gen = ++detectGen;
+      setBusy(true);
+      setTimeout(function () {
+        if (gen !== detectGen) { resolve(null); return; }
+        var t0 = performance.now();
+        var sens = (+$('sens').value) / 100;
+        var useAI = !!(ai.enabled && ai.session);
+        var run;
         if (useAI) {
-          aiStatus('err', 'AI 分析失敗，這張照片已改用離線啟發式結果。');
-          toast('AI 分析失敗，已改用離線模式。');
           aiSkipped = 0;
-          try {
-            var fallback = HelmetDetect.analyze(imgData.data, imgData.width, imgData.height,
-              { sensitivity: sens }).boxes;
-            applyResult(fallback, fresh);
-            $('ms').textContent = '分析 ' + Math.round(performance.now() - t0) + ' ms';
-            return;
-          } catch (e2) { console.error(e2); }
+          run = runAI(sens);
+        } else {
+          aiSkipped = 0;
+          run = Promise.resolve(HelmetDetect.analyze(imgData.data, imgData.width, imgData.height,
+            { sensitivity: sens }).boxes);
         }
-        setBusy(false); toast('分析時發生錯誤，請換一張照片。');
-      });
-    }, 30);
+        Promise.resolve(run).then(function (res) {
+          if (gen !== detectGen || !res) { resolve(null); return; }
+          applyResult(res, fresh);
+          $('ms').textContent = (useAI ? 'AI 分析 ' : '分析 ') + Math.round(performance.now() - t0) + ' ms';
+          resolve(res);
+        }).catch(function (err) {
+          if (gen !== detectGen) { resolve(null); return; }
+          console.error(err);
+          if (useAI) {
+            aiStatus('err', 'AI 分析失敗，這張照片已改用離線啟發式結果。');
+            toast('AI 分析失敗，已改用離線模式。');
+            aiSkipped = 0;
+            try {
+              var fallback = HelmetDetect.analyze(imgData.data, imgData.width, imgData.height,
+                { sensitivity: sens }).boxes;
+              applyResult(fallback, fresh);
+              $('ms').textContent = '分析 ' + Math.round(performance.now() - t0) + ' ms';
+              resolve(fallback);
+              return;
+            } catch (e2) { console.error(e2); }
+          }
+          setBusy(false); toast('分析時發生錯誤，請換一張照片。');
+          resolve(null);
+        });
+      }, 30);
+    });
   }
 
   function hit(p) {
@@ -1280,9 +1525,9 @@ HelmetDetect.init(MODEL_B64);
     return { x: x, y: y, w: w, h: h };
   }
 
-  function updateRate() {
+  function computeRates(list) {
     var pSum = 0, pN = 0, hSum = 0, hN = 0;
-    boxes.forEach(function (b) {
+    list.forEach(function (b) {
       if (b.manual) return;
       if (typeof b.personConf === 'number' && isFinite(b.personConf) && b.personConf >= 0 && b.personConf <= 1) {
         pSum += b.personConf; pN++;
@@ -1291,22 +1536,29 @@ HelmetDetect.init(MODEL_B64);
         hSum += b.helmetConf; hN++;
       }
     });
-    var p = pN ? pSum / pN : null;
-    var h = hN ? hSum / hN : null;
-    $('personRate').textContent = p == null ? '—' : Math.round(p * 100) + '%';
-    $('helmetRate').textContent = h == null ? '—' : Math.round(h * 100) + '%';
-    $('personBar').style.width = p == null ? '0%' : (p * 100).toFixed(1) + '%';
-    $('helmetBar').style.width = h == null ? '0%' : (h * 100).toFixed(1) + '%';
+    return {
+      p: pN ? pSum / pN : null,
+      h: hN ? hSum / hN : null,
+      pSum: pSum, pN: pN, hSum: hSum, hN: hN
+    };
+  }
+
+  function updateRate() {
+    var r = computeRates(boxes);
+    $('personRate').textContent = r.p == null ? '—' : Math.round(r.p * 100) + '%';
+    $('helmetRate').textContent = r.h == null ? '—' : Math.round(r.h * 100) + '%';
+    $('personBar').style.width = r.p == null ? '0%' : (r.p * 100).toFixed(1) + '%';
+    $('helmetBar').style.width = r.h == null ? '0%' : (r.h * 100).toFixed(1) + '%';
 
     var hint;
     if (!boxes.length) {
       hint = '尚無人員框。';
-    } else if (p == null && h == null) {
+    } else if (r.p == null && r.h == null) {
       hint = '啟用 AI 模式或 DeepSeek 後會顯示信心值。';
     } else {
       var parts = [];
-      if (pN) parts.push('人物 ' + pN + ' 框');
-      if (hN) parts.push('安全帽 ' + hN + ' 框');
+      if (r.pN) parts.push('人物 ' + r.pN + ' 框');
+      if (r.hN) parts.push('安全帽 ' + r.hN + ' 框');
       hint = '平均模型信心值（' + parts.join('、') + '），非實際準確率。';
     }
     $('rateHint').textContent = hint;
@@ -1422,7 +1674,11 @@ HelmetDetect.init(MODEL_B64);
   });
 
   $('pick').addEventListener('click', function () { $('file').click(); });
-  $('drop').addEventListener('click', function (e) { if (e.target === $('sampleBtn')) return; $('file').click(); });
+  $('drop').addEventListener('click', function (e) {
+    if (e.target === $('sampleBtn') || e.target === $('batchBtn')) return;
+    if (batchProcessing) { toast('批次分析中，請稍候。'); return; }
+    $('file').click();
+  });
   $('sampleBtn').addEventListener('click', function (e) { e.stopPropagation(); loadURL(SAMPLE_URL, '範例照片'); });
   $('resetBtn').addEventListener('click', function () {
     imgData = null; boxes = []; sel = -1; detectGen++; setBusy(false); aiSkipped = 0;
@@ -1472,6 +1728,21 @@ HelmetDetect.init(MODEL_B64);
     }
   });
 
+  var batchFile = document.createElement('input');
+  batchFile.type = 'file'; batchFile.accept = 'image/*'; batchFile.multiple = true;
+  batchFile.id = 'batchFile'; batchFile.style.display = 'none';
+  document.body.appendChild(batchFile);
+  batchFile.addEventListener('change', function () {
+    if (batchFile.files && batchFile.files.length) addBatchFiles(batchFile.files);
+    batchFile.value = '';
+  });
+  $('batchBtn').addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (batchProcessing) return;
+    batchFile.click();
+  });
+  $('batchClear').addEventListener('click', clearBatch);
+
   ['dragenter', 'dragover'].forEach(function (ev) {
     document.addEventListener(ev, function (e) { e.preventDefault(); $('drop').classList.add('over'); });
   });
@@ -1479,8 +1750,11 @@ HelmetDetect.init(MODEL_B64);
     document.addEventListener(ev, function (e) { e.preventDefault(); $('drop').classList.remove('over'); });
   });
   document.addEventListener('drop', function (e) {
-    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-    if (f) loadURL(URL.createObjectURL(f), f.name);
+    if (batchProcessing) { toast('批次分析中，請稍候。'); return; }
+    var files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+    if (files.length > 1) addBatchFiles(files);
+    else loadURL(URL.createObjectURL(files[0]), files[0].name);
   });
   document.addEventListener('paste', function (e) {
     var items = e.clipboardData && e.clipboardData.items;
