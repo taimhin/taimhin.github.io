@@ -116,6 +116,12 @@
   body.batch-running #dsAuto { opacity:.5; pointer-events:none }
   body.batch-running #ov { pointer-events:none }
 
+  body.ds-only #modes, body.ds-only #manualBlock, body.ds-only #sensBlock,
+  body.ds-only #exportBtn { display:none }
+  body.ds-only #ov { pointer-events:none; cursor:default }
+  body.ds-only #aiBtn { opacity:.5; pointer-events:none }
+  body.ds-only #engineBadge { color:var(--y); border-color:rgba(255,210,30,.5); background:rgba(255,210,30,.07) }
+
   .block{padding:14px 16px;border-bottom:1px solid var(--line)}
   .block:last-child{border-bottom:0}
   .block-h{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
@@ -257,18 +263,19 @@
         <label class="checkline"><input type="checkbox" id="dsRemember"> 記住金鑰（只存在這台瀏覽器）</label>
         <p class="hint" id="dsKeyHint" style="margin:0 0 8px">還沒有金鑰？<a class="link" href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">到 DeepSeek 平台取得</a></p>
         <label class="checkline"><input type="checkbox" id="dsAuto" checked> 載入照片後自動複核（會使用 API 額度）</label>
+        <label class="checkline"><input type="checkbox" id="dsOnly"> 只用 DeepSeek（不載入 YOLO、不畫精確框）</label>
         <button class="btn" id="dsBtn" type="button">用 DeepSeek 複核安全帽</button>
         <p class="status" id="dsStatus"><span class="dot"></span><span id="dsStatusText">金鑰只會直接送到 api.deepseek.com。GitHub Pages 無法隱藏站方金鑰，公開網站請由使用者自行輸入。</span></p>
         <div class="dsresult" id="dsSummary"></div>
       </div>
 
-      <div class="block">
+      <div class="block" id="sensBlock">
         <div class="block-h">偵測靈敏度</div>
         <input type="range" id="sens" min="0" max="100" value="55" aria-label="偵測靈敏度">
         <p class="hint">愈高愈容易抓到遠景人物，也比較可能誤判。改動後放開即重新分析。</p>
       </div>
 
-      <div class="block">
+      <div class="block" id="manualBlock">
         <div class="block-h">手動修正</div>
         <p class="hint" id="modeHint">點一下框，可切換綠／紅。偵測不可能百分之百準確，請以人工覆核為準。</p>
       </div>
@@ -298,6 +305,7 @@
     選用 <b>AI 模式</b> 時，頁面會從 CDN 下載 YOLOv8 安全帽偵測模型（best.onnx，約 12 MB）與 ONNX Runtime Web 執行環境（約 12 MB）到瀏覽器，
     直接辨識 Hardhat／NO-Hardhat／Person；模型只下載、照片仍不上傳。<br>
     模型來源：<code>Liiy1/helmet-onnx-demo</code>（AGPL-3.0）；執行環境：ONNX Runtime Web（MIT）。<br>
+    DeepSeek-only 模式不載入 YOLO，只提供人數、摘要與 DeepSeek 自評信心，<b>不產生精確人員框</b>。<br>
     人物識別率與安全帽識別率為模型信心值的平均（手動框、離線啟發式框不列入），僅供參考，非實際準確率。<br>
     人臉分類器：pico（MIT License, © 2013 Nenad Markus）。離線模式的所有程式與模型都已內嵌，可直接雙擊開啟使用。
   </footer>
@@ -663,8 +671,9 @@ HelmetDetect.init(MODEL_B64);
   var DS_KEY_STORAGE = 'helmet-check.deepseek-key';
   var AUTO_DS_STORAGE = 'helmet-check.deepseek-auto';
   var AI_MODE_STORAGE = 'helmet-check.ai-enabled';
+  var DS_ONLY_STORAGE = 'helmet-check.deepseek-only';
   var DS_DEFAULT_STATUS = '金鑰只會直接送到 api.deepseek.com。GitHub Pages 無法隱藏站方金鑰，公開網站請由使用者自行輸入。';
-  var dsBusy = false, autoDsPending = false;
+  var dsBusy = false, autoDsPending = false, dsOnly = false, dsOnlyResult = null;
 
   function toast(msg) {
     var t = $('toast'); t.textContent = msg; t.classList.add('on');
@@ -750,10 +759,33 @@ HelmetDetect.init(MODEL_B64);
     });
   }
   function setEngine(useAI) {
+    if (dsOnly) {
+      $('engineBadge').textContent = 'DeepSeek';
+      $('engineBadge').classList.add('ai');
+      return;
+    }
     $('engineBadge').textContent = useAI ? 'AI' : '離線';
     $('engineBadge').classList.toggle('ai', useAI);
   }
+  function applyDeepSeekOnlyUI() {
+    document.body.classList.toggle('ds-only', dsOnly);
+    if (dsOnly) {
+      $('aiBtn').disabled = true;
+      $('aiBtn').textContent = 'YOLO 已停用';
+      aiStatus('', 'DeepSeek-only 模式：不使用 YOLO，也不畫精確框。');
+      $('modeHint').textContent = 'DeepSeek-only 模式不產生精確框；請以人數與摘要為準。';
+      setEngine(false);
+    } else {
+      $('aiBtn').disabled = false;
+      $('aiBtn').textContent = ai.enabled ? '關閉 AI 偵測（回離線模式）' : '下載並啟用 AI 模型';
+      if (ai.enabled) aiStatus('on', 'AI 模式已啟用：YOLOv8 安全帽模型。照片仍只在瀏覽器內處理。');
+      else aiStatus('', '目前為離線啟發式模式。AI 模型與執行環境只在第一次啟用時下載。');
+      $('modeHint').textContent = '點一下框，可切換綠／紅。偵測不可能百分之百準確，請以人工覆核為準。';
+      setEngine(ai.enabled);
+    }
+  }
   async function startAILoad() {
+    if (dsOnly) { toast('DeepSeek-only 模式不使用 YOLO。'); return; }
     if (ai.loading) return new Promise(function (resolve) { ai.waiters.push(resolve); });
     ai.loading = true;
     $('aiBtn').disabled = true;
@@ -775,6 +807,7 @@ HelmetDetect.init(MODEL_B64);
     } finally {
       ai.loading = false; $('aiBtn').disabled = false;
       (ai.waiters || []).splice(0).forEach(function (fn) { fn(); });
+      if (dsOnly) applyDeepSeekOnlyUI();
       maybeAutoDeepSeek();
     }
   }
@@ -930,7 +963,10 @@ HelmetDetect.init(MODEL_B64);
     }
     autoDsPending = false;
 
-    var gen = detectGen, snapshot = boxes, targetInfo = deepSeekTargets(), targets = targetInfo.list;
+    var t0 = performance.now();
+    var gen = detectGen, snapshot = boxes;
+    var targetInfo = dsOnly ? { list: [], total: 0 } : deepSeekTargets();
+    var targets = targetInfo.list;
     var savedSummary = '', summary = '';
     dsBusy = true;
     $('dsBtn').disabled = true;
@@ -989,25 +1025,54 @@ HelmetDetect.init(MODEL_B64);
         }
         summary = typeof parsed.summary === 'string' ? parsed.summary : '';
       } else {
-        dsStatus('loading', '畫面中沒有可用的人員框，改送整張照片給 DeepSeek 判讀…');
+        dsStatus('loading', dsOnly ? '正在把整張照片送給 DeepSeek 判讀…' :
+          '畫面中沒有可用的人員框，改送整張照片給 DeepSeek 判讀…');
         var img = cv.toDataURL('image/jpeg', 0.82);
         var parsed2 = await callDeepSeek([
           { role: 'system', content: '你是嚴謹的工地安全帽檢查員。只根據照片中可見的人物做判斷，不要臆測。使用繁體中文。' },
           {
             role: 'user',
             content: [
-              { type: 'text', text: '請找出照片中所有可見的人，判斷每個人是否有戴安全帽。只輸出 JSON，格式如下：{"helmet_count":0,"no_helmet_count":0,"unclear_count":0,"summary":"繁體中文一句話總結"}' },
+              { type: 'text', text: '請找出照片中所有可見的人，判斷每個人是否有戴安全帽，並為每個人給出 person_confidence（你判斷這是一個人）與 helmet_confidence（你判斷安全帽狀態）0 到 1 的信心值。只輸出 JSON，格式如下：{"people":[{"index":1,"helmet":true,"person_confidence":0.95,"helmet_confidence":0.9,"reason":"黃色安全帽"}],"helmet_count":0,"no_helmet_count":0,"unclear_count":0,"summary":"繁體中文一句話總結"}' },
               { type: 'image_url', image_url: { url: img, detail: 'high' } }
             ]
           }
-        ], 1000);
+        ], 1200);
         if (gen !== detectGen) throw new Error('照片已更新，請再按一次 DeepSeek 複核');
-        var hc = Math.max(0, Number(parsed2.helmet_count) || 0);
-        var nc = Math.max(0, Number(parsed2.no_helmet_count) || 0);
-        var uc = Math.max(0, Number(parsed2.unclear_count) || 0);
-        dsStatus('on', 'DeepSeek 判讀：有戴 ' + hc + '、未戴 ' + nc +
-          (uc ? '、不確定 ' + uc : '') + '。（未產生人員框，僅供覆核）');
+        var people = Array.isArray(parsed2.people) ? parsed2.people : [];
+        var hc = 0, nc = 0, uc = 0, pSum = 0, pN = 0, hSum = 0, hN = 0;
+        if (people.length) {
+          people.forEach(function (p) {
+            var hv = triBool(p.helmet);
+            if (hv === true) hc++;
+            else if (hv === false) nc++;
+            else uc++;
+            var pc = normConf(p.person_confidence);
+            var hconf = normConf(p.helmet_confidence != null ? p.helmet_confidence : p.confidence);
+            if (pc != null) { pSum += pc; pN++; }
+            if (hconf != null) { hSum += hconf; hN++; }
+          });
+        } else {
+          hc = Math.max(0, Number(parsed2.helmet_count) || 0);
+          nc = Math.max(0, Number(parsed2.no_helmet_count) || 0);
+          uc = Math.max(0, Number(parsed2.unclear_count) || 0);
+        }
         summary = typeof parsed2.summary === 'string' ? parsed2.summary : '';
+        $('ms').textContent = 'DeepSeek ' + Math.round(performance.now() - t0) + ' ms';
+        if (dsOnly) {
+          dsOnlyResult = {
+            helmet: hc, noHelmet: nc, unclear: uc,
+            pRate: pN ? pSum / pN : null,
+            hRate: hN ? hSum / hN : null,
+            peopleCount: people.length || (hc + nc + uc)
+          };
+          draw(); stats();
+          dsStatus('on', 'DeepSeek-only 判讀：有戴 ' + hc + '、未戴 ' + nc +
+            (uc ? '、不確定 ' + uc : '') + '。');
+        } else {
+          dsStatus('on', 'DeepSeek 判讀：有戴 ' + hc + '、未戴 ' + nc +
+            (uc ? '、不確定 ' + uc : '') + '。（未產生人員框，僅供覆核）');
+        }
       }
       $('dsSummary').textContent = savedSummary + summary;
       persistKey();
@@ -1028,7 +1093,7 @@ HelmetDetect.init(MODEL_B64);
     if (batchMode) return;
     if (!autoDsPending) return;
     if (dsBusy) return;
-    if (ai.loading) return;
+    if (!dsOnly && ai.loading) return;
     if ($('busy').classList.contains('on')) return;
     if (!$('dsAuto') || !$('dsAuto').checked) { autoDsPending = false; return; }
     if (!$('dsKey').value.trim()) {
@@ -1074,7 +1139,9 @@ HelmetDetect.init(MODEL_B64);
     if (hN) text += ' · 安全帽平均 ' + Math.round(hSum / hN * 100) + '%';
     if (done.length && !pN && !hN) text += ' · 尚無識別率';
     $('batchSummary').textContent = text;
-    $('batchSummary').title = pN || hN ? '照片平均：每張照片先取平均，再對照片取平均' : '';
+    $('batchSummary').title = dsOnly
+      ? 'DeepSeek-only：每張照片先取平均，再對照片取平均'
+      : (pN || hN ? '照片平均：每張照片先取平均，再對照片取平均' : '');
   }
   function renderBatch() {
     if (!batchItems.length) {
@@ -1117,7 +1184,9 @@ HelmetDetect.init(MODEL_B64);
       body.appendChild(rates);
       var status = document.createElement('div'); status.className = 'bcstatus';
       if (item.status === 'done') {
-        status.textContent = item.dsUsed ? (item.dsError ? '完成（DeepSeek 失敗）' : '完成（含 DeepSeek）') : '完成';
+        if (item.dsOnly) status.textContent = '完成（DeepSeek-only）';
+        else if (item.dsUsed) status.textContent = item.dsError ? '完成（DeepSeek 失敗）' : '完成（含 DeepSeek）';
+        else status.textContent = '完成';
       } else if (item.status === 'processing') {
         status.textContent = '分析中…';
       } else if (item.status === 'error') {
@@ -1140,7 +1209,7 @@ HelmetDetect.init(MODEL_B64);
     document.body.classList.add('batch-running');
     $('batchBtn').disabled = true;
     try {
-      if (!ai.enabled) {
+      if (!dsOnly && !ai.enabled) {
         try { await startAILoad(); } catch (e) {}
       }
       for (var i = 0; i < batchItems.length; i++) {
@@ -1150,17 +1219,39 @@ HelmetDetect.init(MODEL_B64);
         renderBatch();
         try {
           await showImage(item.url, item.name);
-          var res = await detect(true);
-          if (!res) throw new Error('偵測失敗');
-          var useDS = $('dsAuto').checked && !!$('dsKey').value.trim();
-          if (useDS) {
+          if (dsOnly) {
+            if (!$('dsKey').value.trim()) throw new Error('需要 DeepSeek API Key');
+            dsOnlyResult = null;
             await reviewWithDeepSeek();
+            if (!dsOnlyResult || $('dsStatus').classList.contains('err')) {
+              throw new Error($('dsStatusText').textContent || 'DeepSeek 判讀失敗');
+            }
+            item.dsOnly = true;
             item.dsUsed = true;
-            item.dsError = $('dsStatus').classList.contains('err');
+            item.dsOnlyResult = {
+              helmet: dsOnlyResult.helmet, noHelmet: dsOnlyResult.noHelmet,
+              unclear: dsOnlyResult.unclear, pRate: dsOnlyResult.pRate,
+              hRate: dsOnlyResult.hRate, peopleCount: dsOnlyResult.peopleCount
+            };
+            item.boxes = [];
+            item.rates = {
+              p: dsOnlyResult.pRate, h: dsOnlyResult.hRate,
+              pSum: 0, pN: 0, hSum: 0, hN: 0
+            };
+            item.counts = { ok: dsOnlyResult.helmet, bad: dsOnlyResult.noHelmet };
+          } else {
+            var res = await detect(true);
+            if (!res) throw new Error('偵測失敗');
+            var useDS = $('dsAuto').checked && !!$('dsKey').value.trim();
+            if (useDS) {
+              await reviewWithDeepSeek();
+              item.dsUsed = true;
+              item.dsError = $('dsStatus').classList.contains('err');
+            }
+            item.boxes = cloneBoxList(boxes);
+            item.rates = computeRates(boxes);
+            item.counts = countBoxes(boxes);
           }
-          item.boxes = cloneBoxList(boxes);
-          item.rates = computeRates(boxes);
-          item.counts = countBoxes(boxes);
           item.ms = $('ms').textContent;
           item.summary = $('dsSummary').textContent;
           item.dsStatus = $('dsStatusText').textContent;
@@ -1192,14 +1283,16 @@ HelmetDetect.init(MODEL_B64);
     }
     if (!files.length) return;
     var key = $('dsKey').value.trim();
-    if (files.length > 1 && key && $('dsAuto').checked) {
-      if (!confirm('將分析 ' + files.length + ' 張照片，並自動使用 DeepSeek 複核；會產生 API 費用。要繼續嗎？')) return;
+    if (dsOnly && !key) { toast('DeepSeek-only 模式需要 API Key。'); return; }
+    if (files.length > 1 && (dsOnly || (key && $('dsAuto').checked))) {
+      var modeText = dsOnly ? 'DeepSeek-only 判讀' : 'DeepSeek 複核';
+      if (!confirm('將分析 ' + files.length + ' 張照片，並使用 ' + modeText + '；會產生 API 費用。要繼續嗎？')) return;
     }
     files.forEach(function (f) {
       batchItems.push({
         url: URL.createObjectURL(f), name: f.name, status: 'pending',
         counts: null, rates: null, boxes: null, dsUsed: false, dsError: false,
-        summary: '', dsStatus: '', ms: '', error: ''
+        dsOnly: false, dsOnlyResult: null, summary: '', dsStatus: '', ms: '', error: ''
       });
     });
     batchSelected = -1;
@@ -1213,12 +1306,18 @@ HelmetDetect.init(MODEL_B64);
     batchSelected = idx;
     renderBatch();
     showImage(item.url, item.name).then(function () {
-      boxes = cloneBoxList(item.boxes || []);
       sel = -1;
       autoDsPending = false;
       if (item.dsStatus) dsStatus('', item.dsStatus); else clearDeepSeekResult();
       $('dsSummary').textContent = item.summary || '';
       $('ms').textContent = item.ms || '';
+      if (item.dsOnly) {
+        boxes = [];
+        dsOnlyResult = item.dsOnlyResult || null;
+      } else {
+        boxes = cloneBoxList(item.boxes || []);
+        dsOnlyResult = null;
+      }
       draw(); stats();
     }).catch(function () { toast('這張照片讀不進來。'); });
   }
@@ -1241,7 +1340,8 @@ HelmetDetect.init(MODEL_B64);
         $('drop').classList.add('hide'); $('view').classList.add('show');
         $('toolbar').style.display = 'flex';
         $('fileName').textContent = name;
-        boxes = []; sel = -1; autoDsPending = false;
+        boxes = []; sel = -1; autoDsPending = false; dsOnlyResult = null;
+        detectGen++;
         resetMode(); clearDeepSeekResult();
         resolve({ width: w, height: h });
       };
@@ -1256,7 +1356,19 @@ HelmetDetect.init(MODEL_B64);
       batchSelected = -1;
       if (batchItems.length) renderBatch();
       autoDsPending = true;
-      detect(true);
+      if (dsOnly) {
+        dsOnlyResult = null;
+        stats();
+        if (!$('dsKey').value.trim()) {
+          dsStatus('err', 'DeepSeek-only 模式需要 API Key。請先輸入金鑰。');
+        } else if ($('dsAuto').checked) {
+          maybeAutoDeepSeek();
+        } else {
+          dsStatus('', 'DeepSeek-only 模式：按「用 DeepSeek 複核安全帽」開始判讀。');
+        }
+      } else {
+        detect(true);
+      }
     }).catch(function () {
       toast('這個檔案讀不進來，換一張試試。');
     });
@@ -1408,6 +1520,7 @@ HelmetDetect.init(MODEL_B64);
 
   function detect(fresh) {
     return new Promise(function (resolve) {
+      if (dsOnly) { resolve([]); return; }
       if (!imgData) { resolve(null); return; }
       var gen = ++detectGen;
       setBusy(true);
@@ -1544,6 +1657,23 @@ HelmetDetect.init(MODEL_B64);
   }
 
   function updateRate() {
+    if (dsOnly) {
+      var dr = dsOnlyResult;
+      var dp = dr ? dr.pRate : null;
+      var dh = dr ? dr.hRate : null;
+      $('personRate').textContent = dp == null ? '—' : Math.round(dp * 100) + '%';
+      $('helmetRate').textContent = dh == null ? '—' : Math.round(dh * 100) + '%';
+      $('personBar').style.width = dp == null ? '0%' : (dp * 100).toFixed(1) + '%';
+      $('helmetBar').style.width = dh == null ? '0%' : (dh * 100).toFixed(1) + '%';
+      if (!dr) {
+        $('rateHint').textContent = imgData ? '等待 DeepSeek 判讀…' : '載入照片後等待 DeepSeek 判讀。';
+      } else if (dp == null && dh == null) {
+        $('rateHint').textContent = 'DeepSeek 未提供信心值；目前為自評結果。';
+      } else {
+        $('rateHint').textContent = 'DeepSeek 自評信心（' + (dr.peopleCount || 0) + ' 人），非實際準確率。';
+      }
+      return;
+    }
     var r = computeRates(boxes);
     $('personRate').textContent = r.p == null ? '—' : Math.round(r.p * 100) + '%';
     $('helmetRate').textContent = r.h == null ? '—' : Math.round(r.h * 100) + '%';
@@ -1565,6 +1695,22 @@ HelmetDetect.init(MODEL_B64);
   }
 
   function stats() {
+    if (dsOnly) {
+      var dr = dsOnlyResult;
+      $('nOk').textContent = dr ? dr.helmet : 0;
+      $('nBad').textContent = dr ? dr.noHelmet : 0;
+      var dmsg = '';
+      if (!dr) {
+        dmsg = imgData
+          ? ($('dsKey').value.trim() ? '等待 DeepSeek 判讀…' : 'DeepSeek-only 模式：請先輸入 API Key。')
+          : 'DeepSeek-only 模式：載入照片後按「用 DeepSeek 複核安全帽」。';
+      } else if (dr.unclear) {
+        dmsg = 'DeepSeek 不確定 ' + dr.unclear + ' 人。';
+      }
+      $('note').textContent = dmsg;
+      updateRate();
+      return;
+    }
     var ok = 0, bad = 0;
     boxes.forEach(function (b) { if (b.type) ok++; else bad++; });
     $('nOk').textContent = ok; $('nBad').textContent = bad;
@@ -1659,12 +1805,52 @@ HelmetDetect.init(MODEL_B64);
     }
     var wasAI = false;
     try { wasAI = localStorage.getItem(AI_MODE_STORAGE) === '1'; } catch (e) {}
-    if (wasAI && $('dsKey').value.trim() && !ai.enabled && !ai.loading) startAILoad();
+    if (!dsOnly && wasAI && $('dsKey').value.trim() && !ai.enabled && !ai.loading) startAILoad();
+  });
+
+  var onlyPref = '0';
+  try { onlyPref = localStorage.getItem(DS_ONLY_STORAGE) || '0'; } catch (e) {}
+  dsOnly = onlyPref === '1';
+  $('dsOnly').checked = dsOnly;
+  applyDeepSeekOnlyUI();
+  $('dsOnly').addEventListener('change', function () {
+    if (batchProcessing) {
+      this.checked = !this.checked;
+      toast('批次分析中，請稍候。');
+      return;
+    }
+    if (dsBusy || $('busy').classList.contains('on')) {
+      this.checked = !this.checked;
+      toast('分析中，請稍候再切換模式。');
+      return;
+    }
+    dsOnly = this.checked;
+    try { localStorage.setItem(DS_ONLY_STORAGE, dsOnly ? '1' : '0'); } catch (e) {}
+    applyDeepSeekOnlyUI();
+    dsOnlyResult = null;
+    autoDsPending = false;
+    if (batchItems.length) {
+      clearBatch();
+      toast('已清除批次，請用新模式重新分析。');
+    }
+    boxes = []; sel = -1; draw(); stats();
+    if (dsOnly) {
+      if (!imgData) return;
+      if (!$('dsKey').value.trim()) {
+        dsStatus('err', 'DeepSeek-only 模式需要 API Key。請先輸入金鑰。');
+      } else if ($('dsAuto').checked) {
+        maybeAutoDeepSeek();
+      } else {
+        dsStatus('', 'DeepSeek-only 模式：按「用 DeepSeek 複核安全帽」開始判讀。');
+      }
+    } else if (imgData) {
+      detect(true);
+    }
   });
 
   var aiWasEnabled = false;
   try { aiWasEnabled = localStorage.getItem(AI_MODE_STORAGE) === '1'; } catch (e) {}
-  if (aiWasEnabled && $('dsAuto').checked && $('dsKey').value.trim()) {
+  if (!dsOnly && aiWasEnabled && $('dsAuto').checked && $('dsKey').value.trim()) {
     startAILoad();
   }
 
@@ -1681,13 +1867,14 @@ HelmetDetect.init(MODEL_B64);
   });
   $('sampleBtn').addEventListener('click', function (e) { e.stopPropagation(); loadURL(SAMPLE_URL, '範例照片'); });
   $('resetBtn').addEventListener('click', function () {
-    imgData = null; boxes = []; sel = -1; detectGen++; setBusy(false); aiSkipped = 0;
+    imgData = null; boxes = []; sel = -1; detectGen++; setBusy(false); aiSkipped = 0; dsOnlyResult = null;
     resetMode();
     clearDeepSeekResult();
     $('view').classList.remove('show'); $('drop').classList.remove('hide');
     $('toolbar').style.display = 'none'; $('fileName').textContent = '尚未載入影像';
     $('nOk').textContent = '0'; $('nBad').textContent = '0'; $('note').textContent = ''; $('ms').textContent = '';
     updateRate();
+    if (dsOnly) $('note').textContent = 'DeepSeek-only 模式：載入照片後按「用 DeepSeek 複核安全帽」。';
   });
 
   $('exportBtn').addEventListener('click', function () {
