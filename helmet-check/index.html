@@ -324,7 +324,7 @@
     直接辨識 Hardhat／NO-Hardhat／Person；模型只下載、照片仍不上傳。<br>
     混合模式若開啟自動 DeepSeek 複核，會等 YOLO 與 DeepSeek 都完成後才畫框與更新數字，避免先標記再變更。<br>
     模型來源：<code>Liiy1/helmet-onnx-demo</code>（AGPL-3.0）；執行環境：ONNX Runtime Web（MIT）。<br>
-    DeepSeek-only 模式不載入 YOLO，只提供人數、摘要與 DeepSeek 自評信心，<b>不產生精確人員框</b>。<br>
+    DeepSeek-only 模式不載入 YOLO；若 DeepSeek 回傳框位，會以<b>估算框</b>標示（非精確定位）。<br>
     人物識別率與安全帽識別率為模型信心值的平均（手動框、離線啟發式框不列入），僅供參考，非實際準確率。<br>
     人臉分類器：pico（MIT License, © 2013 Nenad Markus）。離線模式的所有程式與模型都已內嵌，可直接雙擊開啟使用。
   </footer>
@@ -918,6 +918,24 @@ HelmetDetect.init(MODEL_B64);
     if (n < 0 || n > 1) return null;
     return n;
   }
+  function dsBoxToRect(box, w, h) {
+    if (!Array.isArray(box) || box.length < 4) return null;
+    var v = box.slice(0, 4).map(Number);
+    for (var i = 0; i < 4; i++) if (!isFinite(v[i])) return null;
+    var maxv = Math.max(v[0], v[1], v[2], v[3]);
+    var sx, sy;
+    if (maxv <= 1.0001) { sx = w; sy = h; }
+    else if (maxv <= 100.5) { sx = w / 100; sy = h / 100; }
+    else if (maxv <= 1000.5) { sx = w / 1000; sy = h / 1000; }
+    else { sx = 1; sy = 1; }
+    var x1 = v[0] * sx, y1 = v[1] * sy, x2 = v[2] * sx, y2 = v[3] * sy;
+    if (x2 < x1) { var t = x1; x1 = x2; x2 = t; }
+    if (y2 < y1) { var t2 = y1; y1 = y2; y2 = t2; }
+    x1 = Math.max(0, x1); y1 = Math.max(0, y1);
+    x2 = Math.min(w, x2); y2 = Math.min(h, y2);
+    if (x2 - x1 < 4 || y2 - y1 < 4) return null;
+    return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+  }
   async function callDeepSeek(messages, maxTokens) {
     var key = $('dsKey').value.trim();
     if (!key) throw new Error('請先輸入 API Key');
@@ -1054,7 +1072,7 @@ HelmetDetect.init(MODEL_B64);
           {
             role: 'user',
             content: [
-              { type: 'text', text: '請找出照片中所有可見的人，判斷每個人是否有戴安全帽，並為每個人給出 person_confidence（你判斷這是一個人）與 helmet_confidence（你判斷安全帽狀態）0 到 1 的信心值。只輸出 JSON，格式如下：{"people":[{"index":1,"helmet":true,"person_confidence":0.95,"helmet_confidence":0.9,"reason":"黃色安全帽"}],"helmet_count":0,"no_helmet_count":0,"unclear_count":0,"summary":"繁體中文一句話總結"}' },
+              { type: 'text', text: '請找出照片中所有可見的人，判斷每個人是否有戴安全帽，並為每個人給出 person_confidence（你判斷這是一個人）與 helmet_confidence（你判斷安全帽狀態）0 到 1 的信心值。每個人也要提供 box：[x1,y1,x2,y2]，以圖片寬高的 0 到 1000 比例表示，左上角是 (0,0)、右下角是 (1000,1000)，框住每個人的頭部到上半身。只輸出 JSON，格式如下：{"people":[{"index":1,"helmet":true,"person_confidence":0.95,"helmet_confidence":0.9,"box":[200,100,500,600],"reason":"黃色安全帽"}],"helmet_count":0,"no_helmet_count":0,"unclear_count":0,"summary":"繁體中文一句話總結"}' },
               { type: 'image_url', image_url: { url: img, detail: 'high' } }
             ]
           }
@@ -1062,6 +1080,7 @@ HelmetDetect.init(MODEL_B64);
         if (gen !== detectGen) throw new Error('照片已更新，請再按一次 DeepSeek 複核');
         var people = Array.isArray(parsed2.people) ? parsed2.people : [];
         var hc = 0, nc = 0, uc = 0, pSum = 0, pN = 0, hSum = 0, hN = 0;
+        var dsBoxes = [];
         if (people.length) {
           people.forEach(function (p) {
             var hv = triBool(p.helmet);
@@ -1072,6 +1091,15 @@ HelmetDetect.init(MODEL_B64);
             var hconf = normConf(p.helmet_confidence != null ? p.helmet_confidence : p.confidence);
             if (pc != null) { pSum += pc; pN++; }
             if (hconf != null) { hSum += hconf; hN++; }
+            var rect = dsBoxToRect(p.box, cv.width, cv.height);
+            if (rect && hv !== null) {
+              dsBoxes.push({
+                x: rect.x, y: rect.y, w: rect.w, h: rect.h,
+                type: hv ? 1 : 0, conf: hconf,
+                personConf: pc, helmetConf: hconf,
+                ds: true, src: 'deepseek', manual: false
+              });
+            }
           });
         } else {
           hc = Math.max(0, Number(parsed2.helmet_count) || 0);
@@ -1081,6 +1109,7 @@ HelmetDetect.init(MODEL_B64);
         summary = typeof parsed2.summary === 'string' ? parsed2.summary : '';
         $('ms').textContent = 'DeepSeek ' + Math.round(performance.now() - t0) + ' ms';
         if (dsOnly) {
+          boxes = dsBoxes;
           dsOnlyResult = {
             helmet: hc, noHelmet: nc, unclear: uc,
             pRate: pN ? pSum / pN : null,
@@ -1089,7 +1118,7 @@ HelmetDetect.init(MODEL_B64);
           };
           draw(); stats();
           dsStatus('on', 'DeepSeek-only 判讀：有戴 ' + hc + '、未戴 ' + nc +
-            (uc ? '、不確定 ' + uc : '') + '。');
+            (uc ? '、不確定 ' + uc : '') + '。' + (dsBoxes.length ? '（框位由 DeepSeek 估算）' : ''));
         } else {
           dsStatus('on', 'DeepSeek 判讀：有戴 ' + hc + '、未戴 ' + nc +
             (uc ? '、不確定 ' + uc : '') + '。（未產生人員框，僅供覆核）');
@@ -1156,6 +1185,23 @@ HelmetDetect.init(MODEL_B64);
     list.forEach(function (b) { if (b.type) ok++; else bad++; });
     return { ok: ok, bad: bad };
   }
+  function makeBatchThumb() {
+    if (!imgData || !cv.width) return '';
+    var maxW = 360;
+    var sc = Math.min(1, maxW / cv.width);
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(cv.width * sc));
+    c.height = Math.max(1, Math.round(cv.height * sc));
+    var g = c.getContext('2d');
+    g.drawImage(cv, 0, 0, c.width, c.height);
+    boxes.forEach(function (b) {
+      paintBox(g, {
+        x: b.x * sc, y: b.y * sc, w: b.w * sc, h: b.h * sc,
+        type: b.type, conf: b.conf, ds: b.ds, manual: b.manual
+      }, false);
+    });
+    return c.toDataURL('image/jpeg', 0.82);
+  }
   function updateBatchSummary() {
     if (!batchItems.length) {
       $('batchSummary').textContent = '';
@@ -1194,7 +1240,7 @@ HelmetDetect.init(MODEL_B64);
         (item.status === 'processing' ? ' processing' : '') +
         (item.status === 'error' ? ' error' : '');
       var img = document.createElement('img');
-      img.src = item.url; img.alt = ''; img.loading = 'lazy';
+      img.src = item.thumb || item.url; img.alt = ''; img.loading = 'lazy';
       card.appendChild(img);
       var body = document.createElement('div'); body.className = 'bcbody';
       var name = document.createElement('div'); name.className = 'bcname'; name.textContent = item.name;
@@ -1298,7 +1344,7 @@ HelmetDetect.init(MODEL_B64);
               unclear: dsOnlyResult.unclear, pRate: dsOnlyResult.pRate,
               hRate: dsOnlyResult.hRate, peopleCount: dsOnlyResult.peopleCount
             };
-            item.boxes = [];
+            item.boxes = cloneBoxList(boxes);
             item.rates = {
               p: dsOnlyResult.pRate, h: dsOnlyResult.hRate,
               pSum: 0, pN: 0, hSum: 0, hN: 0
@@ -1319,6 +1365,7 @@ HelmetDetect.init(MODEL_B64);
             item.rates = computeRates(boxes);
             item.counts = countBoxes(boxes);
           }
+          item.thumb = makeBatchThumb();
           item.ms = $('ms').textContent;
           item.summary = $('dsSummary').textContent;
           item.dsStatus = $('dsStatusText').textContent;
@@ -1367,7 +1414,7 @@ HelmetDetect.init(MODEL_B64);
       batchItems.push({
         url: URL.createObjectURL(f), name: f.name, status: 'pending',
         counts: null, rates: null, boxes: null, dsUsed: false, dsError: false,
-        dsOnly: false, dsOnlyResult: null, summary: '', dsStatus: '', ms: '', error: ''
+        dsOnly: false, dsOnlyResult: null, summary: '', dsStatus: '', ms: '', error: '', thumb: ''
       });
     });
     batchSelected = -1;
@@ -1387,7 +1434,7 @@ HelmetDetect.init(MODEL_B64);
       $('dsSummary').textContent = item.summary || '';
       $('ms').textContent = item.ms || '';
       if (item.dsOnly) {
-        boxes = [];
+        boxes = cloneBoxList(item.boxes || []);
         dsOnlyResult = item.dsOnlyResult || null;
       } else {
         boxes = cloneBoxList(item.boxes || []);
@@ -1411,7 +1458,7 @@ HelmetDetect.init(MODEL_B64);
       item.counts = null; item.rates = null; item.boxes = null;
       item.dsUsed = false; item.dsError = false;
       item.dsOnly = false; item.dsOnlyResult = null;
-      item.summary = ''; item.dsStatus = ''; item.ms = ''; item.error = '';
+      item.summary = ''; item.dsStatus = ''; item.ms = ''; item.error = ''; item.thumb = '';
     });
     renderBatch();
     processBatchQueue();
