@@ -95,6 +95,8 @@
   .batchpanel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:2px;padding:14px 16px}
   .batchtop{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
   .batchtop .block-h{margin:0}
+  .batchactions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .btn-sm{width:auto;padding:5px 10px;font-size:12px}
   .batchsummary{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.02em}
   .batchlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
   .batchcard{border:1px solid var(--line2);background:var(--panel2);border-radius:2px;overflow:hidden;
@@ -292,7 +294,11 @@
   <section class="batchpanel" id="batchPanel" style="display:none">
     <div class="batchtop">
       <div><span class="block-h" style="margin:0">批次分析</span> <span class="batchsummary" id="batchSummary"></span></div>
-      <button class="link" id="batchClear" type="button">清除批次</button>
+      <div class="batchactions">
+        <button class="btn btn-sm" id="batchPause" type="button" style="display:none">暫停</button>
+        <button class="btn btn-sm" id="batchRestart" type="button" style="display:none">重新開始</button>
+        <button class="link" id="batchClear" type="button">清除批次</button>
+      </div>
     </div>
     <div class="batchlist" id="batchList"></div>
   </section>
@@ -657,7 +663,7 @@ HelmetDetect.init(MODEL_B64);
   var cv = $('cv'), ov = $('ov'), ctx = cv.getContext('2d'), octx = ov.getContext('2d');
   var imgData = null, boxes = [], mode = 'view', drag = null, sel = -1;
   var detectGen = 0, aiSkipped = 0;
-  var batchItems = [], batchProcessing = false, batchMode = false, batchSelected = -1;
+  var batchItems = [], batchProcessing = false, batchMode = false, batchSelected = -1, batchPaused = false;
   var ai = { session: null, inputName: '', outputName: '', loading: false, enabled: false, libs: null, pre: null, waiters: [] };
   /* Optional AI mode: YOLOv8 helmet detector (Hardhat / NO-Hardhat / Person), AGPL-3.0,
      loaded from jsDelivr with ONNX Runtime Web (MIT). Image bytes never leave the page. */
@@ -1199,10 +1205,25 @@ HelmetDetect.init(MODEL_B64);
       card.addEventListener('click', function () { selectBatchItem(idx); });
       list.appendChild(card);
     });
+    var pause = $('batchPause'), restart = $('batchRestart');
+    if (batchProcessing) {
+      pause.style.display = 'inline-block';
+      pause.textContent = batchPaused ? '暫停中…' : '暫停';
+      pause.disabled = batchPaused;
+    } else if (batchPaused || batchItems.some(function (i) { return i.status === 'pending'; })) {
+      pause.style.display = 'inline-block';
+      pause.textContent = '繼續';
+      pause.disabled = false;
+    } else {
+      pause.style.display = 'none';
+      pause.disabled = false;
+    }
+    restart.style.display = batchItems.length ? 'inline-block' : 'none';
+    restart.disabled = batchProcessing;
     updateBatchSummary();
   }
   async function processBatchQueue() {
-    if (batchProcessing) return;
+    if (batchProcessing || batchPaused) return;
     var hasPending = batchItems.some(function (i) { return i.status === 'pending'; });
     if (!hasPending) return;
     batchProcessing = true; batchMode = true;
@@ -1213,6 +1234,7 @@ HelmetDetect.init(MODEL_B64);
         try { await startAILoad(); } catch (e) {}
       }
       for (var i = 0; i < batchItems.length; i++) {
+        if (batchPaused) break;
         var item = batchItems[i];
         if (item.status !== 'pending') continue;
         item.status = 'processing';
@@ -1263,11 +1285,13 @@ HelmetDetect.init(MODEL_B64);
           item.error = err && err.message ? err.message : '分析失敗';
         }
         renderBatch();
+        if (batchPaused) break;
       }
     } finally {
       batchProcessing = false; batchMode = false;
       document.body.classList.remove('batch-running');
       $('batchBtn').disabled = false;
+      if (!batchItems.some(function (i) { return i.status === 'pending'; })) batchPaused = false;
       renderBatch();
     }
   }
@@ -1321,10 +1345,30 @@ HelmetDetect.init(MODEL_B64);
       draw(); stats();
     }).catch(function () { toast('這張照片讀不進來。'); });
   }
+  function restartBatch() {
+    if (batchProcessing) { toast('請先按暫停，等目前照片完成。'); return; }
+    if (!batchItems.length) return;
+    var key = $('dsKey').value.trim();
+    if (dsOnly && !key) { toast('DeepSeek-only 模式需要 API Key。'); return; }
+    if (dsOnly || (key && $('dsAuto').checked)) {
+      if (!confirm('重新開始會重新分析所有照片，並可能再次產生 API 費用。要繼續嗎？')) return;
+    }
+    batchPaused = false;
+    batchSelected = -1;
+    batchItems.forEach(function (item) {
+      item.status = 'pending';
+      item.counts = null; item.rates = null; item.boxes = null;
+      item.dsUsed = false; item.dsError = false;
+      item.dsOnly = false; item.dsOnlyResult = null;
+      item.summary = ''; item.dsStatus = ''; item.ms = ''; item.error = '';
+    });
+    renderBatch();
+    processBatchQueue();
+  }
   function clearBatch() {
     if (batchProcessing) { toast('批次分析中，請稍候。'); return; }
     batchItems.forEach(function (i) { try { URL.revokeObjectURL(i.url); } catch (e) {} });
-    batchItems = []; batchSelected = -1;
+    batchItems = []; batchSelected = -1; batchPaused = false;
     renderBatch();
   }
 
@@ -1929,6 +1973,18 @@ HelmetDetect.init(MODEL_B64);
     batchFile.click();
   });
   $('batchClear').addEventListener('click', clearBatch);
+  $('batchPause').addEventListener('click', function () {
+    if (batchProcessing) {
+      batchPaused = true;
+      renderBatch();
+      toast('會在目前這張照片完成後暫停。');
+    } else if (batchPaused) {
+      batchPaused = false;
+      processBatchQueue();
+      toast('繼續分析。');
+    }
+  });
+  $('batchRestart').addEventListener('click', restartBatch);
 
   ['dragenter', 'dragover'].forEach(function (ev) {
     document.addEventListener(ev, function (e) { e.preventDefault(); $('drop').classList.add('over'); });
