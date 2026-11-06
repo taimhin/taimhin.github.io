@@ -83,6 +83,15 @@
   .count.ok{border-top:2px solid var(--g)} .count.ok .n{color:var(--g)}
   .count.bad{border-top:2px solid var(--r)} .count.bad .n{color:var(--r)}
 
+  .rateblock{padding:14px 16px;border-bottom:1px solid var(--line)}
+  .ratehead{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .ratehead span{font-size:11.5px;color:var(--muted);letter-spacing:.04em}
+  .ratehead b{font-family:var(--mono);font-size:28px;line-height:1;font-weight:600;letter-spacing:-.02em;color:var(--y)}
+  .rateitem + .rateitem{margin-top:14px}
+  .ratebar{height:6px;background:var(--panel2);border:1px solid var(--line);margin-top:10px;overflow:hidden}
+  .ratebar i{display:block;height:100%;width:0;background:var(--y);transition:width .25s,background .25s}
+  .rateblock .hint{margin:8px 0 0}
+
   .block{padding:14px 16px;border-bottom:1px solid var(--line)}
   .block:last-child{border-bottom:0}
   .block-h{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
@@ -198,6 +207,18 @@
         <div class="count bad"><span class="n" id="nBad">0</span><span class="k">未戴安全帽</span></div>
       </div>
 
+      <div class="rateblock">
+        <div class="rateitem">
+          <div class="ratehead"><span>人物識別率</span><b id="personRate">—</b></div>
+          <div class="ratebar"><i id="personBar"></i></div>
+        </div>
+        <div class="rateitem">
+          <div class="ratehead"><span>安全帽識別率</span><b id="helmetRate">—</b></div>
+          <div class="ratebar"><i id="helmetBar"></i></div>
+        </div>
+        <p class="hint" id="rateHint">平均模型信心值，非實際準確率；手動框不列入。</p>
+      </div>
+
       <div class="block">
         <div class="block-h">AI 偵測模式 <span style="color:var(--y)">· 需連網</span></div>
         <div class="modelcard">YOLOv8 安全帽模型 · 約 12 MB<br><span>直接辨識 Hardhat／NO-Hardhat／Person</span></div>
@@ -244,6 +265,7 @@
     選用 <b>AI 模式</b> 時，頁面會從 CDN 下載 YOLOv8 安全帽偵測模型（best.onnx，約 12 MB）與 ONNX Runtime Web 執行環境（約 12 MB）到瀏覽器，
     直接辨識 Hardhat／NO-Hardhat／Person；模型只下載、照片仍不上傳。<br>
     模型來源：<code>Liiy1/helmet-onnx-demo</code>（AGPL-3.0）；執行環境：ONNX Runtime Web（MIT）。<br>
+    人物識別率與安全帽識別率為模型信心值的平均（手動框、離線啟發式框不列入），僅供參考，非實際準確率。<br>
     人臉分類器：pico（MIT License, © 2013 Nenad Markus）。離線模式的所有程式與模型都已內嵌，可直接雙擊開啟使用。
   </footer>
 </div>
@@ -800,6 +822,13 @@ HelmetDetect.init(MODEL_B64);
     if (v === false || v === 0 || v === 'false' || v === 'no') return false;
     return null;
   }
+  function normConf(v) {
+    var n = Number(v);
+    if (!isFinite(n) || n < 0) return null;
+    if (n > 1 && n <= 100) n = n / 100;
+    if (n < 0 || n > 1) return null;
+    return n;
+  }
   async function callDeepSeek(messages, maxTokens) {
     var key = $('dsKey').value.trim();
     if (!key) throw new Error('請先輸入 API Key');
@@ -907,6 +936,8 @@ HelmetDetect.init(MODEL_B64);
           var hv = r ? triBool(r.helmet) : null;
           if (hv === null) { unclear++; return; }
           b.type = hv ? 1 : 0;
+          b.helmetConf = normConf(r.confidence);
+          b.conf = b.helmetConf;
           b.ds = true;
           if (hv) helmet++; else noHelmet++;
           updated++;
@@ -994,7 +1025,12 @@ HelmetDetect.init(MODEL_B64);
   function applyResult(list, fresh) {
     var keep = fresh ? [] : boxes.filter(function (b) { return b.manual; });
     boxes = list.map(function (b) {
-      return { x: b.x, y: b.y, w: b.w, h: b.h, type: b.type, conf: b.conf, src: b.src || '', manual: false };
+      return {
+        x: b.x, y: b.y, w: b.w, h: b.h, type: b.type,
+        conf: b.conf, personConf: b.personConf == null ? null : b.personConf,
+        helmetConf: b.helmetConf == null ? null : b.helmetConf,
+        src: b.src || '', manual: false
+      };
     }).concat(keep);
     sel = -1;
     setBusy(false); draw(); stats();
@@ -1095,7 +1131,7 @@ HelmetDetect.init(MODEL_B64);
         used[best] = true;
         var hd2 = heads[best];
         result.push({ x: p.x, y: p.y, w: p.w, h: p.h, type: hd2.cls === 0 ? 1 : 0,
-          conf: hd2.score, src: 'ai' });
+          conf: hd2.score, personConf: p.score, helmetConf: hd2.score, src: 'ai' });
       } else {
         unmatched.push({ x: p.x, y: p.y, w: p.w, h: p.h, conf: p.score });
       }
@@ -1106,7 +1142,8 @@ HelmetDetect.init(MODEL_B64);
         { sensitivity: sens });
       fb.forEach(function (r2) {
         if (r2.type === 1 || r2.hasFace) {
-          result.push({ x: r2.x, y: r2.y, w: r2.w, h: r2.h, type: r2.type, conf: r2.conf, src: 'ai-color' });
+          result.push({ x: r2.x, y: r2.y, w: r2.w, h: r2.h, type: r2.type,
+            conf: r2.conf, personConf: r2.conf, helmetConf: null, src: 'ai-color' });
         } else {
           aiSkipped++;
         }
@@ -1120,7 +1157,8 @@ HelmetDetect.init(MODEL_B64);
         x: Math.max(0, hd3.x - hd3.w * 0.12),
         y: Math.max(0, hd3.y - hd3.h * 0.2),
         w: hd3.w * 1.24, h: hd3.h * 1.4,
-        type: hd3.cls === 0 ? 1 : 0, conf: hd3.score, src: 'ai-head'
+        type: hd3.cls === 0 ? 1 : 0, conf: hd3.score,
+        personConf: null, helmetConf: hd3.score, src: 'ai-head'
       });
     }
 
@@ -1242,6 +1280,38 @@ HelmetDetect.init(MODEL_B64);
     return { x: x, y: y, w: w, h: h };
   }
 
+  function updateRate() {
+    var pSum = 0, pN = 0, hSum = 0, hN = 0;
+    boxes.forEach(function (b) {
+      if (b.manual) return;
+      if (typeof b.personConf === 'number' && isFinite(b.personConf) && b.personConf >= 0 && b.personConf <= 1) {
+        pSum += b.personConf; pN++;
+      }
+      if (typeof b.helmetConf === 'number' && isFinite(b.helmetConf) && b.helmetConf >= 0 && b.helmetConf <= 1) {
+        hSum += b.helmetConf; hN++;
+      }
+    });
+    var p = pN ? pSum / pN : null;
+    var h = hN ? hSum / hN : null;
+    $('personRate').textContent = p == null ? '—' : Math.round(p * 100) + '%';
+    $('helmetRate').textContent = h == null ? '—' : Math.round(h * 100) + '%';
+    $('personBar').style.width = p == null ? '0%' : (p * 100).toFixed(1) + '%';
+    $('helmetBar').style.width = h == null ? '0%' : (h * 100).toFixed(1) + '%';
+
+    var hint;
+    if (!boxes.length) {
+      hint = '尚無人員框。';
+    } else if (p == null && h == null) {
+      hint = '啟用 AI 模式或 DeepSeek 後會顯示信心值。';
+    } else {
+      var parts = [];
+      if (pN) parts.push('人物 ' + pN + ' 框');
+      if (hN) parts.push('安全帽 ' + hN + ' 框');
+      hint = '平均模型信心值（' + parts.join('、') + '），非實際準確率。';
+    }
+    $('rateHint').textContent = hint;
+  }
+
   function stats() {
     var ok = 0, bad = 0;
     boxes.forEach(function (b) { if (b.type) ok++; else bad++; });
@@ -1249,6 +1319,7 @@ HelmetDetect.init(MODEL_B64);
     var msg = boxes.length ? '' : '沒有偵測到人員。可提高靈敏度後重新偵測，或用「加框」手動標記。';
     if (aiSkipped) msg += (msg ? ' ' : '') + '另有 ' + aiSkipped + ' 個人物未判定。';
     $('note').textContent = msg;
+    updateRate();
   }
 
   /* ------- pointer ------- */
@@ -1264,7 +1335,13 @@ HelmetDetect.init(MODEL_B64);
     var i = hit(p);
     if (i < 0) { sel = -1; draw(); return; }
     if (mode === 'del') { boxes.splice(i, 1); sel = -1; }
-    else { boxes[i].type = boxes[i].type ? 0 : 1; sel = i; }
+    else {
+      boxes[i].type = boxes[i].type ? 0 : 1;
+      boxes[i].helmetConf = null;
+      boxes[i].conf = null;
+      boxes[i].ds = false;
+      sel = i;
+    }
     draw(); stats();
   });
   ov.addEventListener('pointermove', function (e) {
@@ -1354,6 +1431,7 @@ HelmetDetect.init(MODEL_B64);
     $('view').classList.remove('show'); $('drop').classList.remove('hide');
     $('toolbar').style.display = 'none'; $('fileName').textContent = '尚未載入影像';
     $('nOk').textContent = '0'; $('nBad').textContent = '0'; $('note').textContent = ''; $('ms').textContent = '';
+    updateRate();
   });
 
   $('exportBtn').addEventListener('click', function () {
@@ -1415,6 +1493,7 @@ HelmetDetect.init(MODEL_B64);
     }
   });
 
+  updateRate();
   if (location.search.indexOf('sample') >= 0) loadURL(SAMPLE_URL, '範例照片');
 })();
 </script>
