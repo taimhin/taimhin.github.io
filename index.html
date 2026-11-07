@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-Hant" class="no-js">
+<html lang="zh-Hant" class="no-js" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -39,6 +39,15 @@
         var saved = localStorage.getItem('tmh-lang');
         if (saved === 'en') root.lang = 'en';
       } catch (error) {}
+      try {
+        var savedTheme = localStorage.getItem('tmh-theme');
+        if (savedTheme !== 'light' && savedTheme !== 'dark') savedTheme = 'dark';
+        root.setAttribute('data-theme', savedTheme);
+        var themeMeta = document.querySelector('meta[name="theme-color"]');
+        if (themeMeta) themeMeta.setAttribute('content', savedTheme === 'light' ? '#f4efe5' : '#080706');
+      } catch (error) {
+        root.setAttribute('data-theme', 'dark');
+      }
     })();
   </script>
 
@@ -85,6 +94,11 @@
           <span class="slash" aria-hidden="true">/</span>
           <button type="button" data-lang="en" aria-pressed="false" aria-label="English">EN</button>
         </div>
+
+        <button type="button" class="theme-toggle" data-theme-toggle aria-label="切換淺色模式 / Switch to light mode" aria-pressed="false" title="切換淺色 / 深色">
+          <span class="theme-moon" aria-hidden="true">☾</span>
+          <span class="theme-sun" aria-hidden="true">☀</span>
+        </button>
 
         <button type="button" class="menu-toggle" aria-expanded="false" aria-controls="mobile-menu">
           <span class="menu-line" aria-hidden="true"></span>

@@ -110,6 +110,57 @@
   })();
 
   /* ---------------------------------------------------------
+     Theme
+     --------------------------------------------------------- */
+  const themeToggle = $("[data-theme-toggle]");
+  const themeMeta = $('meta[name="theme-color"]');
+
+  function currentTheme() {
+    return root.dataset.theme === "light" ? "light" : "dark";
+  }
+
+  function themeLabel(theme) {
+    return theme === "light"
+      ? "切換深色模式 / Switch to dark mode"
+      : "切換淺色模式 / Switch to light mode";
+  }
+
+  function setTheme(theme, options) {
+    const normalized = theme === "light" ? "light" : "dark";
+    root.dataset.theme = normalized;
+
+    if (themeMeta) {
+      themeMeta.setAttribute("content", normalized === "light" ? "#f4efe5" : "#080706");
+    }
+
+    if (themeToggle) {
+      themeToggle.setAttribute("aria-pressed", String(normalized === "light"));
+      themeToggle.setAttribute("aria-label", themeLabel(normalized));
+      themeToggle.setAttribute("title", themeLabel(normalized));
+    }
+
+    if (!options || options.save !== false) {
+      try {
+        localStorage.setItem("tmh-theme", normalized);
+      } catch (error) {
+        /* localStorage can be blocked in private mode or on file:// */
+      }
+    }
+  }
+
+  if (themeToggle) {
+    themeToggle.addEventListener("click", () => {
+      setTheme(currentTheme() === "light" ? "dark" : "light");
+    });
+  }
+
+  window.addEventListener("storage", (event) => {
+    if (event.key === "tmh-theme" && (event.newValue === "light" || event.newValue === "dark")) {
+      setTheme(event.newValue, { save: false });
+    }
+  });
+
+  /* ---------------------------------------------------------
      Header scroll progress
      --------------------------------------------------------- */
   const header = $(".site-header");
@@ -494,5 +545,6 @@
   /* ---------------------------------------------------------
      Apply the saved language once every element exists.
      --------------------------------------------------------- */
+  setTheme(currentTheme(), { save: false });
   setLanguage(savedLang === "en" ? "en" : "zh");
 })();
